@@ -1,92 +1,31 @@
-{% extends "base.html" %}
-
-{% block title %}홈{% endblock %}
-
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8 text-center mb-5">
-        <h1 class="display-4 mb-3 text-primary">PDF 프로세서</h1>
-        <p class="lead mb-4 text-secondary">PDF 파일을 손쉽게 변환, 편집, 압축하세요. OCR로 텍스트를 추출하고, 폼을 관리하고, 보안을 설정할 수 있습니다.</p>
-    </div>
-</div>
-
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-file-transfer-line ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">PDF 변환</h5>
-                <p class="card-text">PDF를 Word, 이미지로 변환하거나, 다른 형식의 파일을 PDF로 변환할 수 있습니다.</p>
-                <a href="{{ url_for('main.convert') }}" class="btn btn-primary">변환하기</a>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">PDF 처리</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="/process" method="post" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">PDF 파일 선택</label>
+                                <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">처리하기</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-file-list-line ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">PDF 구성</h5>
-                <p class="card-text">PDF 페이지를 재정렬하고, 회전하고, 삭제하여 문서를 구성할 수 있습니다.</p>
-                <a href="{{ url_for('main.organize') }}" class="btn btn-primary">구성하기</a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-edit-line ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">PDF 편집</h5>
-                <p class="card-text">텍스트 추가, 워터마크 삽입, 페이지 번호 매기기 등 다양한 편집이 가능합니다.</p>
-                <a href="{{ url_for('main.edit') }}" class="btn btn-primary">편집하기</a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-text ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">OCR 텍스트 추출</h5>
-                <p class="card-text">스캔된 PDF나 이미지에서 텍스트를 추출하고 편집 가능한 형식으로 변환합니다.</p>
-                <a href="{{ url_for('main.ocr') }}" class="btn btn-primary">텍스트 추출</a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-lock-line ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">PDF 보안</h5>
-                <p class="card-text">비밀번호 설정, 권한 제어, 워터마크 등으로 PDF 문서를 안전하게 보호합니다.</p>
-                <a href="{{ url_for('main.security') }}" class="btn btn-primary">보안 설정</a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="ri-file-reduce-line ri-3x mb-3 text-primary"></i>
-                <h5 class="card-title">PDF 압축</h5>
-                <p class="card-text">파일 크기를 줄이면서도 품질은 유지하는 스마트한 PDF 압축을 제공합니다.</p>
-                <a href="{{ url_for('main.compress') }}" class="btn btn-primary">압축하기</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-5">
-    <div class="col-lg-8 mx-auto">
-        <div class="card bg-primary text-white">
-            <div class="card-body text-center py-4">
-                <h4 class="mb-3">지금 바로 시작하세요!</h4>
-                <p class="mb-4">PDF 프로세서로 문서 작업을 더 쉽고 효율적으로 처리할 수 있습니다.</p>
-                <a href="{{ url_for('main.convert') }}" class="btn btn-light">시작하기</a>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %} 
+</body>
+</html> 

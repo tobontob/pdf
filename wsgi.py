@@ -1,21 +1,48 @@
-from pdf_processor import create_app
+from flask import Flask, render_template, request, send_file
+import PyPDF2
 import io
-from flask import send_file
 
-app = create_app()
+app = Flask(__name__)
 
-# Vercel은 'app' 변수를 찾습니다
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/process', methods=['POST'])
+def process_file():
+    if 'file' not in request.files:
+        return 'No file uploaded', 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return 'No file selected', 400
+    
+    if not file.filename.endswith('.pdf'):
+        return 'Only PDF files are allowed', 400
+    
+    try:
+        # 메모리에서 PDF 처리
+        pdf_content = io.BytesIO(file.read())
+        pdf_reader = PyPDF2.PdfReader(pdf_content)
+        pdf_writer = PyPDF2.PdfWriter()
+        
+        # 모든 페이지 복사
+        for page in pdf_reader.pages:
+            pdf_writer.add_page(page)
+        
+        # 결과를 메모리에 저장
+        output = io.BytesIO()
+        pdf_writer.write(output)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='processed.pdf'
+        )
+    except Exception as e:
+        return str(e), 500
+
 if __name__ == '__main__':
-    app.run()  # debug=True 제거 
-
-def process_file(file):
-    # 메모리에서 파일 처리
-    file_content = file.read()
-    # 처리 로직
-    result = process_in_memory(file_content)
-    # 바로 응답으로 전송
-    return send_file(
-        io.BytesIO(result),
-        as_attachment=True,
-        download_name='processed.pdf'
-    ) 
+    app.run() 
