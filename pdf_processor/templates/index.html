@@ -15,7 +15,8 @@
                         <h5 class="card-title mb-0">PDF 처리</h5>
                     </div>
                     <div class="card-body">
-                        <form action="/process" method="post" enctype="multipart/form-data">
+                        <div id="errorAlert" class="alert alert-danger" style="display: none;"></div>
+                        <form id="uploadForm" action="/process" method="post" enctype="multipart/form-data">
                             <div class="mb-3">
                                 <label for="file" class="form-label">PDF 파일 선택</label>
                                 <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
@@ -27,5 +28,40 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const errorAlert = document.getElementById('errorAlert');
+            errorAlert.style.display = 'none';
+            
+            try {
+                const formData = new FormData(this);
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'An error occurred');
+                }
+                
+                // If the response is OK, it's a file download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'processed.pdf';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (error) {
+                errorAlert.textContent = error.message;
+                errorAlert.style.display = 'block';
+            }
+        });
+    </script>
 </body>
 </html> 
