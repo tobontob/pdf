@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 mb-5">
     <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body text-center">
@@ -25,6 +25,17 @@
     <div class="col-md-4">
         <div class="card h-100">
             <div class="card-body text-center">
+                <i class="ri-file-list-line ri-3x mb-3 text-primary"></i>
+                <h3 class="h4 mb-3">구성</h3>
+                <p class="text-secondary mb-4">PDF 파일의 페이지를 재배열하고, 여러 PDF를 하나로 병합하거나 분할할 수 있습니다.</p>
+                <a href="/organize" class="btn btn-outline-primary">구성하기</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
                 <i class="ri-edit-line ri-3x mb-3 text-primary"></i>
                 <h3 class="h4 mb-3">편집</h3>
                 <p class="text-secondary mb-4">PDF 파일의 페이지를 추가, 삭제, 회전하거나 여러 PDF를 하나로 병합할 수 있습니다.</p>
@@ -32,8 +43,21 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="ri-text ri-3x mb-3 text-primary"></i>
+                <h3 class="h4 mb-3">OCR</h3>
+                <p class="text-secondary mb-4">스캔된 PDF 문서에서 텍스트를 추출하고 검색 가능한 PDF로 변환합니다.</p>
+                <a href="/ocr" class="btn btn-outline-primary">OCR 처리</a>
+            </div>
+        </div>
+    </div>
     
-    <div class="col-md-4">
+    <div class="col-md-6">
         <div class="card h-100">
             <div class="card-body text-center">
                 <i class="ri-compress-line ri-3x mb-3 text-primary"></i>
@@ -45,7 +69,7 @@
     </div>
 </div>
 
-<div class="row mt-4">
+<div class="row mt-5">
     <div class="col-12">
         <div class="card">
             <div class="card-body">
@@ -54,7 +78,7 @@
                         <h3 class="h4 mb-3">PDF 처리</h3>
                         <div class="file-upload" id="mainDropZone">
                             <div class="upload-content">
-                                <i class="ri-upload-cloud-line"></i>
+                                <i class="ri-upload-cloud-line ri-3x mb-3"></i>
                                 <p class="mb-2">PDF 파일을 드래그하거나 클릭하여 업로드</p>
                                 <button type="button" class="btn-upload">파일 선택</button>
                             </div>
@@ -78,4 +102,110 @@
         </div>
     </div>
 </div>
+
+<div class="processing-overlay" style="display: none;">
+    <div class="processing-overlay__content">
+        <div class="spinner-border text-light mb-3" role="status">
+            <span class="visually-hidden">처리 중...</span>
+        </div>
+        <h4 class="text-light">PDF 처리 중...</h4>
+        <p class="text-light mb-0">잠시만 기다려주세요.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('mainDropZone');
+    const fileInput = dropZone.querySelector('input[type="file"]');
+    const form = document.getElementById('mainForm');
+    const progressBar = document.querySelector('.progress');
+    const progressBarInner = progressBar.querySelector('.progress-bar');
+    const statusDiv = document.getElementById('processStatus');
+    const overlay = document.querySelector('.processing-overlay');
+
+    // 파일 드롭 이벤트
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('file-upload--over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('file-upload--over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('file-upload--over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateFileDisplay(files[0].name);
+        }
+    });
+
+    // 파일 선택 버튼
+    const uploadButton = dropZone.querySelector('.btn-upload');
+    uploadButton.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            updateFileDisplay(e.target.files[0].name);
+        }
+    });
+
+    // 폼 제출
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        
+        try {
+            progressBar.style.display = 'block';
+            overlay.style.display = 'flex';
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+
+            const response = await fetch('/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('PDF 처리 중 오류가 발생했습니다.');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'processed.pdf';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+            statusDiv.textContent = 'PDF 처리가 완료되었습니다.';
+            statusDiv.className = 'alert alert-success';
+        } catch (error) {
+            statusDiv.textContent = error.message;
+            statusDiv.className = 'alert alert-danger';
+        } finally {
+            progressBar.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+    });
+
+    function updateFileDisplay(fileName) {
+        const display = dropZone.querySelector('.file-name-display');
+        display.textContent = fileName;
+        display.style.display = 'block';
+    }
+});
+</script>
 {% endblock %} 
