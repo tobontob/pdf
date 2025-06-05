@@ -17,7 +17,7 @@
                 <h5 class="mb-0">PDF에서 변환</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('main.convert_from_pdf') }}" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfFromForm">
+                <form action="/convert-from-pdf" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfFromForm">
                     <div class="mb-4 file-upload" id="pdfDropZone">
                         <div class="upload-content">
                             <i class="ri-upload-cloud-line"></i>
@@ -54,7 +54,7 @@
                 <h5 class="mb-0">PDF로 변환</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('main.convert_to_pdf') }}" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfToForm">
+                <form action="/convert-to-pdf" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfToForm">
                     <div class="mb-4 file-upload" id="fileDropZone">
                         <div class="upload-content">
                             <i class="ri-upload-cloud-line"></i>
