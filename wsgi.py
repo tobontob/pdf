@@ -36,8 +36,8 @@ def compress():
 def ocr():
     return render_template('ocr.html')
 
-@app.route('/convert-from-pdf', methods=['POST'])
-def convert_from_pdf():
+@app.route('/process-edit', methods=['POST'])
+def process_edit():
     try:
         if 'pdf_file' not in request.files:
             return jsonify({'error': 'No file uploaded'}), 400
@@ -54,37 +54,92 @@ def convert_from_pdf():
         pdf_reader = PyPDF2.PdfReader(pdf_content)
         pdf_writer = PyPDF2.PdfWriter()
         
-        # 모든 페이지 복사
-        for page in pdf_reader.pages:
-            pdf_writer.add_page(page)
+        # 편집 작업 수행
+        operation = request.form.get('edit_operation', '')
+        page_range = request.form.get('page_range', '')
         
-        # 결과를 메모리에 저장
-        output = io.BytesIO()
-        pdf_writer.write(output)
-        output.seek(0)
+        # 여기에 실제 편집 로직을 구현해야 합니다
+        # 현재는 예시로 에러 응답을 반환합니다
+        return jsonify({'error': 'Edit operation not implemented yet'}), 501
         
-        return send_file(
-            output,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name='processed.pdf'
-        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/convert-to-pdf', methods=['POST'])
-def convert_to_pdf():
+@app.route('/process-compress', methods=['POST'])
+def process_compress():
     try:
-        if 'input_file' not in request.files:
+        if 'pdf_file' not in request.files:
             return jsonify({'error': 'No file uploaded'}), 400
         
-        file = request.files['input_file']
+        file = request.files['pdf_file']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        # 여기에 실제 변환 로직을 구현해야 합니다
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed'}), 400
+        
+        # 메모리에서 PDF 처리
+        pdf_content = io.BytesIO(file.read())
+        pdf_reader = PyPDF2.PdfReader(pdf_content)
+        pdf_writer = PyPDF2.PdfWriter()
+        
+        # 압축 작업 수행
+        compression_level = request.form.get('compression_level', 'medium')
+        optimize_images = request.form.get('optimize_images', 'false') == 'true'
+        
+        # 여기에 실제 압축 로직을 구현해야 합니다
         # 현재는 예시로 에러 응답을 반환합니다
-        return jsonify({'error': 'File conversion not implemented yet'}), 501
+        return jsonify({'error': 'Compression not implemented yet'}), 501
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/process-ocr', methods=['POST'])
+def process_ocr():
+    try:
+        if 'pdf_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['pdf_file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'Only PDF files are allowed'}), 400
+        
+        # OCR 작업 수행
+        language = request.form.get('language', 'kor')
+        searchable_pdf = request.form.get('searchable_pdf', 'false') == 'true'
+        
+        # 여기에 실제 OCR 로직을 구현해야 합니다
+        # 현재는 예시로 에러 응답을 반환합니다
+        return jsonify({'error': 'OCR not implemented yet'}), 501
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/process-organize', methods=['POST'])
+def process_organize():
+    try:
+        if 'pdf_files' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        files = request.files.getlist('pdf_files')
+        if not files or files[0].filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        for file in files:
+            if not file.filename.endswith('.pdf'):
+                return jsonify({'error': 'Only PDF files are allowed'}), 400
+        
+        # 구성 작업 수행
+        operation = request.form.get('organize_operation', '')
+        split_method = request.form.get('split_method', '')
+        page_range = request.form.get('page_range', '')
+        
+        # 여기에 실제 구성 로직을 구현해야 합니다
+        # 현재는 예시로 에러 응답을 반환합니다
+        return jsonify({'error': 'Organization not implemented yet'}), 501
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

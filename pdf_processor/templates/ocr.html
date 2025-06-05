@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}PDF 프로세서 - OCR{% endblock %}
+{% block title %}OCR{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center mb-3">
     <div class="col-lg-8 text-center">
-        <h2 class="mb-3">OCR 텍스트 추출</h2>
-        <p class="lead text-secondary">스캔된 PDF나 이미지에서 텍스트를 추출하고 편집 가능한 형식으로 변환하세요.</p>
+        <h2 class="mb-3">PDF OCR</h2>
+        <p class="lead text-secondary">스캔된 PDF 문서에서 텍스트를 추출하고 검색 가능한 PDF로 변환합니다.</p>
     </div>
 </div>
 
@@ -14,62 +14,42 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">텍스트 추출 (OCR)</h5>
+                <h5 class="mb-0">PDF OCR 처리</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('main.ocr') }}" method="post" enctype="multipart/form-data">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="file_type" class="form-label">파일 형식</label>
-                                <select class="form-select" id="file_type" name="file_type" required>
-                                    <option value="pdf">PDF 문서</option>
-                                    <option value="image">이미지 (PNG, JPG 등)</option>
-                                </select>
-                            </div>
+                <form action="/process-ocr" method="post" enctype="multipart/form-data" data-ajax="true" id="ocrForm">
+                    <div class="mb-4 file-upload" id="pdfDropZone">
+                        <div class="upload-content">
+                            <i class="ri-upload-cloud-line"></i>
+                            <p class="mb-2">PDF 파일을 드래그하거나 클릭하여 업로드</p>
+                            <button type="button" class="btn-upload">파일 선택</button>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="language" class="form-label">OCR 언어</label>
-                                <select class="form-select" id="language" name="language" required>
-                                    <option value="kor">한국어</option>
-                                    <option value="eng">영어</option>
-                                    <option value="jpn">일본어</option>
-                                    <option value="chi_sim">중국어 (간체)</option>
-                                    <option value="chi_tra">중국어 (번체)</option>
-                                    <option value="fra">프랑스어</option>
-                                    <option value="deu">독일어</option>
-                                    <option value="spa">스페인어</option>
-                                </select>
-                                <small class="text-muted">선택한 언어의 데이터 파일이 설치되어 있는지 확인하세요</small>
-                            </div>
-                        </div>
+                        <input type="file" name="pdf_file" accept=".pdf" class="file-input" required>
+                        <div class="file-name-display"></div>
                     </div>
 
-                    <div class="file-upload mb-3" id="ocrDropZone">
-                        <i class="ri-file-text-line"></i>
-                        <p class="mb-2">파일을 드래그하거나 클릭하여 업로드</p>
-                        <input type="file" name="file" class="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp" required>
+                    <div class="mb-3">
+                        <label class="form-label">언어 선택</label>
+                        <select name="language" class="form-select" required>
+                            <option value="kor">한국어</option>
+                            <option value="eng">영어</option>
+                            <option value="jpn">일본어</option>
+                            <option value="chi_sim">중국어 (간체)</option>
+                            <option value="chi_tra">중국어 (번체)</option>
+                        </select>
                     </div>
 
-                    <div class="progress mb-3" style="display: none;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                    </div>
-
-                    <div class="preview-wrapper mb-3" style="display: none;">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">추출된 텍스트</h6>
-                            </div>
-                            <div class="card-body">
-                                <pre id="text-preview" class="bg-light p-3" style="max-height: 300px; overflow-y: auto;"></pre>
-                            </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" name="searchable_pdf" class="form-check-input" id="searchablePdf" checked>
+                            <label class="form-check-label" for="searchablePdf">검색 가능한 PDF 생성</label>
                         </div>
+                        <div class="form-text">원본 PDF에 텍스트 레이어를 추가하여 검색 가능한 PDF를 생성합니다.</div>
                     </div>
 
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary">
-                            <i class="ri-text-wrap me-1"></i>텍스트 추출
+                            <i class="ri-text me-1"></i>OCR 처리하기
                         </button>
                     </div>
                 </form>
@@ -78,25 +58,28 @@
     </div>
 </div>
 
-<div id="operationStatus"></div>
-
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">OCR 진행 상태</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="ocrStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const dropZone = document.getElementById('ocrDropZone');
+    const dropZone = document.getElementById('pdfDropZone');
     const fileInput = dropZone.querySelector('input[type="file"]');
-    const fileType = document.getElementById('file_type');
-
-    // 파일 형식 변경 시 허용 확장자 업데이트
-    fileType.addEventListener('change', function() {
-        if (this.value === 'pdf') {
-            fileInput.accept = '.pdf';
-        } else {
-            fileInput.accept = '.png,.jpg,.jpeg,.tiff,.bmp';
-        }
-    });
 
     // 클릭 이벤트
     dropZone.addEventListener('click', () => {
