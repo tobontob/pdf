@@ -30,7 +30,7 @@
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+            <a class="navbar-brand" href="/">
                 <i class="ri-file-pdf-line me-2"></i>PDF 프로세서
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -39,27 +39,27 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.convert') }}">
+                        <a class="nav-link" href="/convert">
                             <i class="ri-file-transfer-line me-1"></i>변환
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.organize') }}">
+                        <a class="nav-link" href="/organize">
                             <i class="ri-file-list-line me-1"></i>구성
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.edit') }}">
+                        <a class="nav-link" href="/edit">
                             <i class="ri-edit-line me-1"></i>편집
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.ocr') }}">
+                        <a class="nav-link" href="/ocr">
                             <i class="ri-text me-1"></i>OCR
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.compress') }}">
+                        <a class="nav-link" href="/compress">
                             <i class="ri-compress-line me-1"></i>압축
                         </a>
                     </li>
