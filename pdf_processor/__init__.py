@@ -35,8 +35,8 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
     app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 
-    # Import and register routes
-    from . import app as main_bp
-    app.register_blueprint(main_bp.bp)
+    # Blueprint 등록
+    from .views import main_bp
+    app.register_blueprint(main_bp)
 
     return app 
