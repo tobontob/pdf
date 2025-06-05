@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Processor - Batch Processing{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Batch PDF Processing</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('batch') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="action" class="form-label">Select Action</label>
+                        <select class="form-select" id="action" name="action" required>
+                            <option value="">Choose action...</option>
+                            <option value="convert">Convert PDFs</option>
+                            <option value="compress">Compress PDFs</option>
+                            <option value="extract_text">Extract Text</option>
+                            <option value="add_watermark">Add Watermark</option>
+                            <option value="encrypt">Encrypt PDFs</option>
+                        </select>
+                    </div>
+
+                    <div class="drop-zone">
+                        <span class="drop-zone__prompt">Drop PDF files here or click to upload</span>
+                        <input type="file" name="files" class="drop-zone__input" accept=".pdf" multiple required>
+                    </div>
+
+                    <!-- Convert Options -->
+                    <div id="convert-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="convert_to" class="form-label">Convert To</label>
+                            <select class="form-select" id="convert_to" name="convert_to">
+                                <option value="docx">Word (DOCX)</option>
+                                <option value="xlsx">Excel (XLSX)</option>
+                                <option value="pptx">PowerPoint (PPTX)</option>
+                                <option value="jpg">Image (JPG)</option>
+                                <option value="png">Image (PNG)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Compress Options -->
+                    <div id="compress-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="compression_level" class="form-label">Compression Level</label>
+                            <select class="form-select" id="compression_level" name="compression_level">
+                                <option value="low">Low (Better Quality)</option>
+                                <option value="medium" selected>Medium (Balanced)</option>
+                                <option value="high">High (Smaller Size)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Extract Text Options -->
+                    <div id="extract-text-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="output_format" class="form-label">Output Format</label>
+                            <select class="form-select" id="output_format" name="output_format">
+                                <option value="txt">Text File (TXT)</option>
+                                <option value="docx">Word Document (DOCX)</option>
+                                <option value="json">JSON</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="use_ocr" name="use_ocr">
+                            <label class="form-check-label" for="use_ocr">
+                                Use OCR for scanned documents
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Watermark Options -->
+                    <div id="watermark-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="watermark_text" class="form-label">Watermark Text</label>
+                            <input type="text" class="form-control" id="watermark_text" name="watermark_text">
+                        </div>
+                        <div class="mb-3">
+                            <label for="watermark_opacity" class="form-label">Opacity</label>
+                            <input type="range" class="form-range" id="watermark_opacity" name="watermark_opacity" min="0" max="100" value="30">
+                        </div>
+                    </div>
+
+                    <!-- Encrypt Options -->
+                    <div id="encrypt-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                        </div>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">Process Files</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="results-container" class="row mt-4" style="display: none;">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Processing Results</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table">
+                            <!-- Results will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-3">
+                    <button class="btn btn-success" id="download-all">Download All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert-wrapper"></div>
+
+<div class="processing-overlay">
+    <div class="processing-overlay__content">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Processing...</span>
+        </div>
+        <span>Processing your files...</span>
+        <div class="progress mt-3" style="width: 200px;">
+            <div class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('action').addEventListener('change', function() {
+    // Hide all action options
+    document.querySelectorAll('.action-options').forEach(options => {
+        options.style.display = 'none';
+    });
+    
+    // Show selected action options
+    const selectedAction = this.value;
+    if (selectedAction === 'convert') {
+        document.getElementById('convert-options').style.display = 'block';
+    } else if (selectedAction === 'compress') {
+        document.getElementById('compress-options').style.display = 'block';
+    } else if (selectedAction === 'extract_text') {
+        document.getElementById('extract-text-options').style.display = 'block';
+    } else if (selectedAction === 'add_watermark') {
+        document.getElementById('watermark-options').style.display = 'block';
+    } else if (selectedAction === 'encrypt') {
+        document.getElementById('encrypt-options').style.display = 'block';
+    }
+});
+
+document.querySelector('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Validate form based on selected action
+    const action = document.getElementById('action').value;
+    if (action === 'encrypt') {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        if (password !== confirmPassword) {
+            showAlert('Error', 'Passwords do not match', 'danger');
+            return;
+        }
+    } else if (action === 'add_watermark') {
+        const watermarkText = document.getElementById('watermark_text').value;
+        if (!watermarkText.trim()) {
+            showAlert('Error', 'Watermark text is required', 'danger');
+            return;
+        }
+    }
+    
+    showProcessingOverlay();
+    const formData = new FormData(this);
+    const files = formData.getAll('files');
+    const totalFiles = files.length;
+    let processedFiles = 0;
+    
+    try {
+        // Clear previous results
+        document.getElementById('results-table').innerHTML = '';
+        
+        // Process each file
+        for (const file of files) {
+            const fileFormData = new FormData();
+            fileFormData.append('file', file);
+            
+            // Add other form data
+            for (const [key, value] of formData.entries()) {
+                if (key !== 'files') {
+                    fileFormData.append(key, value);
+                }
+            }
+            
+            const response = await fetch('/batch', {
+                method: 'POST',
+                body: fileFormData
+            });
+            
+            const result = await response.json();
+            
+            // Add result to table
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${file.name}</td>
+                <td>
+                    <span class="badge ${response.ok ? 'bg-success' : 'bg-danger'}">
+                        ${response.ok ? 'Success' : 'Failed'}
+                    </span>
+                </td>
+                <td>
+                    ${response.ok ? `
+                        <a href="${result.download_url}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    ` : `
+                        <span class="text-danger">${result.error}</span>
+                    `}
+                </td>
+            `;
+            document.getElementById('results-table').appendChild(row);
+            
+            // Update progress
+            processedFiles++;
+            const progress = (processedFiles / totalFiles) * 100;
+            document.querySelector('.processing-overlay .progress-bar').style.width = `${progress}%`;
+            document.querySelector('.processing-overlay .progress-bar').textContent = `${Math.round(progress)}%`;
+        }
+        
+        // Show results
+        document.getElementById('results-container').style.display = 'block';
+        hideProcessingOverlay();
+        
+    } catch (error) {
+        hideProcessingOverlay();
+        showAlert('Error', error.message, 'danger');
+    }
+});
+
+// Download all button
+document.getElementById('download-all').addEventListener('click', function() {
+    const downloadLinks = document.querySelectorAll('#results-table a[href]');
+    downloadLinks.forEach(link => {
+        window.open(link.href, '_blank');
+    });
+});
+</script>
+
+<style>
+.progress {
+    height: 5px;
+}
+
+.badge {
+    font-size: 0.8rem;
+}
+
+.processing-overlay .progress {
+    height: 10px;
+}
+</style>
+{% endblock %} 

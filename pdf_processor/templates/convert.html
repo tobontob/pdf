@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}변환{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mb-3">
+    <div class="col-lg-8 text-center">
+        <h2 class="mb-3">PDF 변환</h2>
+        <p class="lead text-secondary">PDF 파일을 다양한 형식으로 변환하거나, 다른 형식의 파일을 PDF로 변환할 수 있습니다.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">PDF에서 변환</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('main.convert_from_pdf') }}" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfFromForm">
+                    <div class="mb-4 file-upload" id="pdfDropZone">
+                        <div class="upload-content">
+                            <i class="ri-upload-cloud-line"></i>
+                            <p class="mb-2">PDF 파일을 드래그하거나 클릭하여 업로드</p>
+                            <button type="button" class="btn-upload">파일 선택</button>
+                        </div>
+                        <input type="file" name="pdf_file" accept=".pdf" class="file-input" required>
+                        <div class="file-name-display"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">변환 형식</label>
+                        <select name="output_format" class="form-select" required>
+                            <option value="docx">Word 문서 (.docx)</option>
+                            <option value="jpg">이미지 - JPG (.jpg)</option>
+                            <option value="png">이미지 - PNG (.png)</option>
+                            <option value="text">텍스트 파일 (.txt)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ri-file-transfer-line me-1"></i>변환하기
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">PDF로 변환</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('main.convert_to_pdf') }}" method="post" enctype="multipart/form-data" data-ajax="true" id="pdfToForm">
+                    <div class="mb-4 file-upload" id="fileDropZone">
+                        <div class="upload-content">
+                            <i class="ri-upload-cloud-line"></i>
+                            <p class="mb-2">파일을 드래그하거나 클릭하여 업로드</p>
+                            <p class="text-muted small">지원 형식: Word, Excel, PowerPoint, 이미지</p>
+                            <button type="button" class="btn-upload">파일 선택</button>
+                        </div>
+                        <input type="file" name="input_file" accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" class="file-input" required>
+                        <div class="file-name-display"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" name="merge_files" class="form-check-input" id="mergeFiles">
+                            <label class="form-check-label" for="mergeFiles">여러 파일을 하나의 PDF로 병합</label>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ri-file-pdf-line me-1"></i>PDF로 변환
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">변환 진행 상태</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="conversionStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

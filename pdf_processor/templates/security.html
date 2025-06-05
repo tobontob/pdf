@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Processor - Security{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">PDF Security</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('security') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="action" class="form-label">Select Action</label>
+                        <select class="form-select" id="action" name="action" required>
+                            <option value="">Choose action...</option>
+                            <option value="encrypt">Encrypt PDF</option>
+                            <option value="decrypt">Decrypt PDF</option>
+                            <option value="set_permissions">Set Permissions</option>
+                        </select>
+                    </div>
+
+                    <div class="drop-zone">
+                        <span class="drop-zone__prompt">Drop PDF file here or click to upload</span>
+                        <input type="file" name="file" class="drop-zone__input" accept=".pdf" required>
+                    </div>
+
+                    <!-- Encryption Options -->
+                    <div id="encrypt-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                    </div>
+
+                    <!-- Decryption Options -->
+                    <div id="decrypt-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="decrypt_password" class="form-label">PDF Password</label>
+                            <input type="password" class="form-control" id="decrypt_password" name="decrypt_password" required>
+                        </div>
+                    </div>
+
+                    <!-- Permission Options -->
+                    <div id="permission-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="owner_password" class="form-label">Owner Password</label>
+                            <input type="password" class="form-control" id="owner_password" name="owner_password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Permissions</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="allow_print" name="permissions[print]" checked>
+                                <label class="form-check-label" for="allow_print">Allow Printing</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="allow_modify" name="permissions[modify]" checked>
+                                <label class="form-check-label" for="allow_modify">Allow Modification</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="allow_copy" name="permissions[copy]" checked>
+                                <label class="form-check-label" for="allow_copy">Allow Copying</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="allow_annotate" name="permissions[annotate]" checked>
+                                <label class="form-check-label" for="allow_annotate">Allow Annotations</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">Process PDF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert-wrapper"></div>
+
+<div class="processing-overlay">
+    <div class="processing-overlay__content">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Processing...</span>
+        </div>
+        <span>Processing your PDF...</span>
+    </div>
+</div>
+
+<script>
+document.getElementById('action').addEventListener('change', function() {
+    // Hide all action options
+    document.querySelectorAll('.action-options').forEach(options => {
+        options.style.display = 'none';
+    });
+    
+    // Show selected action options
+    const selectedAction = this.value;
+    if (selectedAction === 'encrypt') {
+        document.getElementById('encrypt-options').style.display = 'block';
+    } else if (selectedAction === 'decrypt') {
+        document.getElementById('decrypt-options').style.display = 'block';
+    } else if (selectedAction === 'set_permissions') {
+        document.getElementById('permission-options').style.display = 'block';
+    }
+});
+
+// Password confirmation validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const action = document.getElementById('action').value;
+    if (action === 'encrypt') {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        if (password !== confirmPassword) {
+            e.preventDefault();
+            showAlert('Error', 'Passwords do not match', 'danger');
+            return;
+        }
+    }
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}편집{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mb-3">
+    <div class="col-lg-8 text-center">
+        <h2 class="mb-3">PDF 편집</h2>
+        <p class="lead text-secondary">PDF 파일의 내용을 수정하고 편집하세요.</p>
+    </div>
+</div>
+
+<form action="{{ url_for('main.edit') }}" method="post" enctype="multipart/form-data">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">PDF 편집</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-4 file-upload" id="editDropZone">
+                <i class="ri-edit-2-line"></i>
+                <p class="mb-2">PDF 파일을 드래그하거나 클릭하여 업로드</p>
+                <input type="file" name="pdf_file" accept=".pdf" class="file-input" required>
+                <div class="file-name-display"></div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">편집 작업</label>
+                <select name="edit_type" class="form-select" required>
+                    <option value="text">텍스트 수정</option>
+                    <option value="image">이미지 수정</option>
+                    <option value="annotate">주석 추가</option>
+                </select>
+            </div>
+            
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="ri-edit-line me-1"></i>편집하기
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">편집 진행 상태</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="editStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

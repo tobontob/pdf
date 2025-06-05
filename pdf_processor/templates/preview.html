@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Processor - Preview{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">PDF Preview</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('preview') }}" method="post" enctype="multipart/form-data">
+                    <div class="drop-zone">
+                        <span class="drop-zone__prompt">Drop PDF file here or click to upload</span>
+                        <input type="file" name="file" class="drop-zone__input" accept=".pdf" required>
+                    </div>
+
+                    <div class="preview-options mb-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="show_thumbnails" name="show_thumbnails" checked>
+                            <label class="form-check-label" for="show_thumbnails">Show Thumbnails</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="show_text" name="show_text" checked>
+                            <label class="form-check-label" for="show_text">Show Text Content</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="show_metadata" name="show_metadata" checked>
+                            <label class="form-check-label" for="show_metadata">Show Metadata</label>
+                        </div>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">Preview PDF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="preview-container" class="mt-4" style="display: none;">
+    <div class="row">
+        <!-- Thumbnails -->
+        <div id="thumbnails-container" class="col-md-3" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Thumbnails</h6>
+                </div>
+                <div class="card-body">
+                    <div id="thumbnails" class="d-flex flex-column gap-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Preview -->
+        <div id="main-preview" class="col">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Preview</h6>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" id="prev-page" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span class="btn btn-sm btn-outline-secondary disabled" id="page-info">
+                                Page <span id="current-page">1</span> of <span id="total-pages">1</span>
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary" id="next-page" disabled>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" id="zoom-out">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <span class="btn btn-sm btn-outline-secondary disabled" id="zoom-level">100%</span>
+                            <button class="btn btn-sm btn-outline-secondary" id="zoom-in">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="pdf-viewer" class="text-center"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text Content -->
+        <div id="text-content-container" class="col-md-3" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Text Content</h6>
+                </div>
+                <div class="card-body">
+                    <div id="text-content" class="text-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata -->
+    <div id="metadata-container" class="row mt-4" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Document Metadata</h6>
+                </div>
+                <div class="card-body">
+                    <div id="metadata" class="metadata"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert-wrapper"></div>
+
+<div class="processing-overlay">
+    <div class="processing-overlay__content">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Processing...</span>
+        </div>
+        <span>Processing your PDF...</span>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+let pdfDoc = null;
+let pageNum = 1;
+let zoomLevel = 1.0;
+const ZOOM_STEP = 0.25;
+
+document.querySelector('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    showProcessingOverlay();
+
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('/preview', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Failed to process PDF');
+
+        const data = await response.json();
+        
+        // Load PDF
+        pdfDoc = await pdfjsLib.getDocument(data.pdf_url).promise;
+        
+        // Update UI
+        document.getElementById('total-pages').textContent = pdfDoc.numPages;
+        document.getElementById('prev-page').disabled = false;
+        document.getElementById('next-page').disabled = false;
+        
+        // Show preview container
+        document.getElementById('preview-container').style.display = 'block';
+        
+        // Show/hide sections based on options
+        const showThumbnails = document.getElementById('show_thumbnails').checked;
+        const showText = document.getElementById('show_text').checked;
+        const showMetadata = document.getElementById('show_metadata').checked;
+        
+        document.getElementById('thumbnails-container').style.display = showThumbnails ? 'block' : 'none';
+        document.getElementById('text-content-container').style.display = showText ? 'block' : 'none';
+        document.getElementById('metadata-container').style.display = showMetadata ? 'block' : 'none';
+        
+        // Load first page
+        await loadPage(1);
+        
+        // Load thumbnails
+        if (showThumbnails) {
+            await loadThumbnails();
+        }
+        
+        // Load text content
+        if (showText) {
+            await loadTextContent(1);
+        }
+        
+        // Load metadata
+        if (showMetadata) {
+            displayMetadata(data.metadata);
+        }
+        
+        hideProcessingOverlay();
+    } catch (error) {
+        hideProcessingOverlay();
+        showAlert('Error', error.message, 'danger');
+    }
+});
+
+async function loadPage(num) {
+    try {
+        const page = await pdfDoc.getPage(num);
+        const viewport = page.getViewport({ scale: zoomLevel });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        
+        const viewer = document.getElementById('pdf-viewer');
+        viewer.innerHTML = '';
+        viewer.appendChild(canvas);
+        
+        pageNum = num;
+        document.getElementById('current-page').textContent = pageNum;
+        
+        // Update text content if visible
+        if (document.getElementById('text-content-container').style.display !== 'none') {
+            await loadTextContent(num);
+        }
+    } catch (error) {
+        showAlert('Error', 'Failed to load page', 'danger');
+    }
+}
+
+async function loadThumbnails() {
+    const container = document.getElementById('thumbnails');
+    container.innerHTML = '';
+    
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 0.2 });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'thumbnail';
+        thumbnail.appendChild(canvas);
+        thumbnail.addEventListener('click', () => loadPage(i));
+        
+        container.appendChild(thumbnail);
+    }
+}
+
+async function loadTextContent(num) {
+    try {
+        const page = await pdfDoc.getPage(num);
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(item => item.str).join(' ');
+        
+        document.getElementById('text-content').textContent = text;
+    } catch (error) {
+        showAlert('Error', 'Failed to load text content', 'danger');
+    }
+}
+
+function displayMetadata(metadata) {
+    const container = document.getElementById('metadata');
+    container.innerHTML = '';
+    
+    for (const [key, value] of Object.entries(metadata)) {
+        const row = document.createElement('div');
+        row.className = 'row mb-2';
+        row.innerHTML = `
+            <div class="col-md-3"><strong>${key}:</strong></div>
+            <div class="col-md-9">${value}</div>
+        `;
+        container.appendChild(row);
+    }
+}
+
+// Navigation
+document.getElementById('prev-page').addEventListener('click', () => {
+    if (pageNum <= 1) return;
+    loadPage(pageNum - 1);
+});
+
+document.getElementById('next-page').addEventListener('click', () => {
+    if (pageNum >= pdfDoc.numPages) return;
+    loadPage(pageNum + 1);
+});
+
+// Zoom
+document.getElementById('zoom-in').addEventListener('click', () => {
+    zoomLevel = Math.min(zoomLevel + ZOOM_STEP, 3.0);
+    document.getElementById('zoom-level').textContent = `${Math.round(zoomLevel * 100)}%`;
+    loadPage(pageNum);
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+    zoomLevel = Math.max(zoomLevel - ZOOM_STEP, 0.25);
+    document.getElementById('zoom-level').textContent = `${Math.round(zoomLevel * 100)}%`;
+    loadPage(pageNum);
+});
+</script>
+
+<style>
+.thumbnail {
+    cursor: pointer;
+    border: 1px solid #ddd;
+    padding: 5px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+}
+
+.thumbnail:hover {
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0,123,255,0.5);
+}
+
+.text-content {
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+.metadata {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#pdf-viewer {
+    max-height: 800px;
+    overflow-y: auto;
+}
+
+#pdf-viewer canvas {
+    max-width: 100%;
+    height: auto;
+}
+</style>
+{% endblock %} 

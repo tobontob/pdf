@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Processor - Form Fields{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">PDF Form Fields</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('forms') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="action" class="form-label">Select Action</label>
+                        <select class="form-select" id="action" name="action" required>
+                            <option value="">Choose action...</option>
+                            <option value="add_fields">Add Form Fields</option>
+                            <option value="fill_fields">Fill Form Fields</option>
+                            <option value="extract_fields">Extract Form Fields</option>
+                            <option value="flatten_fields">Flatten Form Fields</option>
+                        </select>
+                    </div>
+
+                    <div class="drop-zone">
+                        <span class="drop-zone__prompt">Drop PDF file here or click to upload</span>
+                        <input type="file" name="file" class="drop-zone__input" accept=".pdf" required>
+                    </div>
+
+                    <!-- Add Fields Options -->
+                    <div id="add-fields-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-secondary" id="add-field-btn">Add Field</button>
+                        </div>
+                        <div id="fields-container">
+                            <!-- Dynamic field entries will be added here -->
+                        </div>
+                    </div>
+
+                    <!-- Fill Fields Options -->
+                    <div id="fill-fields-options" class="action-options" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="use_json" name="use_json">
+                                <label class="form-check-label" for="use_json">
+                                    Upload JSON file with field values
+                                </label>
+                            </div>
+                        </div>
+                        <div id="json-upload" style="display: none;">
+                            <div class="mb-3">
+                                <label for="json_file" class="form-label">JSON File</label>
+                                <input type="file" class="form-control" id="json_file" name="json_file" accept=".json">
+                            </div>
+                        </div>
+                        <div id="manual-fields">
+                            <!-- Dynamic field entries for filling will be added here -->
+                        </div>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">Process PDF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert-wrapper"></div>
+
+<div class="processing-overlay">
+    <div class="processing-overlay__content">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Processing...</span>
+        </div>
+        <span>Processing your PDF...</span>
+    </div>
+</div>
+
+<script>
+// Field counter for unique IDs
+let fieldCounter = 0;
+
+// Handle action selection
+document.getElementById('action').addEventListener('change', function() {
+    // Hide all action options
+    document.querySelectorAll('.action-options').forEach(options => {
+        options.style.display = 'none';
+    });
+    
+    // Show selected action options
+    const selectedAction = this.value;
+    if (selectedAction === 'add_fields') {
+        document.getElementById('add-fields-options').style.display = 'block';
+    } else if (selectedAction === 'fill_fields') {
+        document.getElementById('fill-fields-options').style.display = 'block';
+        // Load existing fields when PDF is uploaded
+        loadPdfFields();
+    }
+});
+
+// Toggle JSON file upload
+document.getElementById('use_json').addEventListener('change', function() {
+    document.getElementById('json-upload').style.display = this.checked ? 'block' : 'none';
+    document.getElementById('manual-fields').style.display = this.checked ? 'none' : 'block';
+});
+
+// Add new form field
+document.getElementById('add-field-btn').addEventListener('click', function() {
+    const fieldsContainer = document.getElementById('fields-container');
+    const fieldId = fieldCounter++;
+    
+    const fieldHtml = `
+        <div class="field-entry mb-3">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Field Type</label>
+                    <select class="form-select" name="field_type_${fieldId}" required>
+                        <option value="text">Text</option>
+                        <option value="checkbox">Checkbox</option>
+                        <option value="radio">Radio Button</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Field Name</label>
+                    <input type="text" class="form-control" name="field_name_${fieldId}" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Page Number</label>
+                    <input type="number" class="form-control" name="field_page_${fieldId}" min="1" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Coordinates (x,y)</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="field_x_${fieldId}" placeholder="x" required>
+                        <input type="number" class="form-control" name="field_y_${fieldId}" placeholder="y" required>
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" class="btn btn-danger" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    fieldsContainer.insertAdjacentHTML('beforeend', fieldHtml);
+});
+
+// Load existing form fields from PDF
+async function loadPdfFields() {
+    const fileInput = document.querySelector('.drop-zone__input');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const response = await fetch('/get_form_fields', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Failed to load form fields');
+
+        const fields = await response.json();
+        const manualFields = document.getElementById('manual-fields');
+        manualFields.innerHTML = '';
+
+        fields.forEach(field => {
+            const fieldHtml = `
+                <div class="mb-3">
+                    <label class="form-label">${field.name}</label>
+                    <input type="${field.type === 'checkbox' ? 'checkbox' : 'text'}" 
+                           class="form-control" 
+                           name="field_value_${field.name}"
+                           ${field.type === 'checkbox' ? '' : 'required'}>
+                </div>
+            `;
+            manualFields.insertAdjacentHTML('beforeend', fieldHtml);
+        });
+    } catch (error) {
+        showAlert('Error', error.message, 'danger');
+    }
+}
+
+// Handle file drop/selection
+document.querySelector('.drop-zone__input').addEventListener('change', function() {
+    if (document.getElementById('action').value === 'fill_fields') {
+        loadPdfFields();
+    }
+});
+</script>
+{% endblock %} 
