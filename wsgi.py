@@ -5,12 +5,15 @@ import os
 import sys
 import traceback
 
-app = Flask(__name__)
-app.debug = True  # Vercel에서 디버그 정보를 볼 수 있도록 설정
-
-# 템플릿 디렉토리 설정
+# 정적 파일과 템플릿 디렉토리 경로 설정
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'pdf_processor', 'static'))
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'pdf_processor', 'templates'))
-app.template_folder = template_dir
+
+app = Flask(__name__,
+           static_folder=static_dir,
+           template_folder=template_dir)
+
+app.debug = True  # Vercel에서 디버그 정보를 볼 수 있도록 설정
 
 @app.route('/')
 def index():
@@ -23,6 +26,7 @@ def index():
             'error': str(e),
             'trace': traceback.format_exc(),
             'template_dir': template_dir,
+            'static_dir': static_dir,
             'current_dir': os.getcwd(),
             'files': os.listdir(os.getcwd())
         }), 500
@@ -81,6 +85,22 @@ def internal_error(error):
 @app.errorhandler(404)
 def not_found_error(error):
     return jsonify({'error': 'Not found'}), 404
+
+@app.route('/convert')
+def convert():
+    return render_template('convert.html')
+
+@app.route('/edit')
+def edit():
+    return render_template('edit.html')
+
+@app.route('/compress')
+def compress():
+    return render_template('compress.html')
+
+@app.route('/ocr')
+def ocr():
+    return render_template('ocr.html')
 
 if __name__ == '__main__':
     app.run() 
