@@ -3,8 +3,6 @@ import tempfile
 import uuid
 import subprocess
 from pathlib import Path
-import olefile
-import re
 from bs4 import BeautifulSoup
 import pdfkit
 
@@ -13,61 +11,84 @@ class HwpConverter:
         self.temp_dir = os.path.join(tempfile.gettempdir(), 'pdf_converter')
         if not os.path.exists(self.temp_dir):
             os.makedirs(self.temp_dir)
+            
+        # wkhtmltopdf 설정
+        self.wkhtmltopdf_path = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+        self.pdf_config = pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
 
     def extract_text_from_hwp(self, hwp_path):
         """HWP 파일에서 텍스트 추출"""
         try:
-            f = olefile.OleFileIO(hwp_path)
-            dirs = f.listdir()
-
-            # HWP 파일 내부의 "BodyText" 스트림 찾기
-            bodytext = []
-            for dir in dirs:
-                if 'bodytext' in dir[0].lower():
-                    body_stream = f.openstream(dir)
-                    data = body_stream.read()
-                    bodytext.append(data)
-                    
-            # 텍스트 추출 및 정리
-            text = []
-            for data in bodytext:
-                # 한글 문자 찾기 (유니코드 범위: AC00-D7AF)
-                found = re.findall(b'[\xac-\xd7][\x00-\xff]', data)
-                for ch in found:
-                    try:
-                        text.append(ch.decode('utf-16'))
-                    except:
-                        continue
-
-            return ''.join(text)
+            # 임시 텍스트 파일 경로
+            text_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.txt")
             
-        finally:
-            f.close()
+            # hwp5txt 명령어 실행
+            subprocess.run(['hwp5txt', '--output', text_path, hwp_path], check=True)
+            
+            # 텍스트 파일 읽기
+            with open(text_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+                
+            # 임시 파일 삭제
+            os.remove(text_path)
+            
+            return text
+            
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"HWP 파일 변환 오류: {str(e)}")
+        except Exception as e:
+            raise Exception(f"텍스트 추출 오류: {str(e)}")
 
     def create_html(self, text):
         """추출된 텍스트로 HTML 생성"""
-        soup = BeautifulSoup('<html><head><meta charset="utf-8"></head><body></body></html>', 'html.parser')
+        soup = BeautifulSoup('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>변환된 문서</title>
+        </head>
+        <body></body>
+        </html>
+        ''', 'html.parser')
         
         # 스타일 추가
         style = soup.new_tag('style')
         style.string = '''
+            @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap');
             body { 
-                font-family: 'Malgun Gothic', sans-serif;
-                line-height: 1.6;
+                font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif;
+                line-height: 1.8;
                 margin: 2cm;
+                word-break: keep-all;
+                overflow-wrap: break-word;
+                font-size: 11pt;
             }
             p { 
-                margin-bottom: 1em; 
+                margin: 0;
+                padding: 0.5em 0;
+                text-align: justify;
+            }
+            .page-break {
+                page-break-after: always;
             }
         '''
         soup.head.append(style)
         
         # 텍스트를 단락으로 분할하여 추가
-        for paragraph in text.split('\n'):
+        paragraphs = text.split('\n')
+        for i, paragraph in enumerate(paragraphs):
             if paragraph.strip():
                 p = soup.new_tag('p')
                 p.string = paragraph.strip()
                 soup.body.append(p)
+                
+                # 빈 줄이 연속으로 나오면 페이지 나누기 추가
+                if i < len(paragraphs) - 1 and not paragraphs[i+1].strip():
+                    div = soup.new_tag('div')
+                    div['class'] = 'page-break'
+                    soup.body.append(div)
         
         return str(soup)
 
@@ -91,14 +112,19 @@ class HwpConverter:
             output_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.pdf")
             options = {
                 'page-size': 'A4',
-                'margin-top': '0mm',
-                'margin-right': '0mm',
-                'margin-bottom': '0mm',
-                'margin-left': '0mm',
-                'encoding': 'UTF-8'
+                'margin-top': '20mm',
+                'margin-right': '20mm',
+                'margin-bottom': '20mm',
+                'margin-left': '20mm',
+                'encoding': 'UTF-8',
+                'no-outline': None,
+                'enable-local-file-access': None,
+                'disable-smart-shrinking': None,
+                'dpi': 300,
+                'image-dpi': 300
             }
             
-            pdfkit.from_file(html_path, output_path, options=options)
+            pdfkit.from_file(html_path, output_path, options=options, configuration=self.pdf_config)
             
             return output_path
             
