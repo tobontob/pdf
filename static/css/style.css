@@ -1,0 +1,62 @@
+.file-upload {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-upload.dragover {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+}
+
+.file-upload .upload-content {
+    margin-bottom: 15px;
+}
+
+.file-upload i {
+    font-size: 48px;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.file-upload .btn-upload {
+    background: #0d6efd;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.file-upload input[type="file"] {
+    display: none;
+}
+
+.file-name-display {
+    margin-top: 10px;
+    word-break: break-all;
+    display: none;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: none;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.btn-primary {
+    padding: 8px 16px;
+}
+
+.btn-primary i {
+    font-size: 1.1em;
+} 

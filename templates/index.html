@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}PDF 프로세서{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 text-center">
+        <h1 class="display-4 mb-4">PDF 프로세서</h1>
+        <p class="lead mb-5">PDF 파일을 쉽고 빠르게 처리하세요</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="ri-file-transfer-line ri-3x mb-3 text-primary"></i>
+                <h5 class="card-title">PDF 변환</h5>
+                <p class="card-text">PDF를 Word, 이미지 등 다양한 형식으로 변환하거나, 다른 형식의 파일을 PDF로 변환할 수 있습니다.</p>
+                <a href="{{ url_for('convert') }}" class="btn btn-primary">
+                    <i class="ri-arrow-right-line"></i> 변환하기
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
