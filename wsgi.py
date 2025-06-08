@@ -1,17 +1,611 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, send_file, jsonify
+import os
+import tempfile
+from werkzeug.utils import secure_filename
+from pdf2docx import Converter
+import pythoncom
+import win32com.client as win32
+from pathlib import Path
+import uuid
+import sys
+import win32gui
+import win32con
+import time
+from converters.image_converter import ImageConverter
+from converters.document_converter import DocumentConverter
+from converters.hwp_converter import HwpConverter
+from converters.excel_converter import ExcelConverter
+from converters.powerpoint_converter import PowerPointConverter
 
 # Flask 앱 생성
 app = Flask(__name__,
            template_folder='templates',
            static_folder='static')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# 임시 파일 저장 경로
+TEMP_DIR = os.path.join(tempfile.gettempdir(), 'pdf_converter')
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR)
+
+# 변환기 인스턴스 생성
+image_converter = ImageConverter()
+document_converter = DocumentConverter()
+hwp_converter = HwpConverter()
+excel_converter = ExcelConverter()
+powerpoint_converter = PowerPointConverter()
+
+def init_hwp():
+    """한글 객체 초기화"""
+    try:
+        pythoncom.CoInitialize()
+        hwp = win32.Dispatch("HWPFrame.HwpObject")
+        hwp.XHwpWindows.Item(0).Visible = False
+        hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
+        return hwp
+    except Exception as e:
+        print(f"Error initializing HWP: {e}")
+        raise
+
+def quit_hwp(hwp):
+    """한글 객체 종료"""
+    try:
+        hwp.Quit()
+        pythoncom.CoUninitialize()
+    except:
+        pass
 
 @app.route('/')
 def index():
-    return render_template('convert.html')
+    return render_template('index.html')
 
-@app.route('/convert')
-def convert():
-    return render_template('convert.html')
+@app.route('/image')
+def image_converter_page():
+    return render_template('image.html')
+
+@app.route('/document')
+def document_converter_page():
+    return render_template('document.html')
+
+@app.route('/hwp')
+def hwp_converter_page():
+    return render_template('hwp.html')
+
+@app.route('/excel')
+def excel_converter_page():
+    return render_template('excel.html')
+
+@app.route('/powerpoint')
+def powerpoint_converter_page():
+    return render_template('powerpoint.html')
+
+@app.route('/convert/pdf-to-docx', methods=['POST'])
+def pdf_to_docx():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 고유한 임시 파일 경로 생성
+        unique_id = str(uuid.uuid4())
+        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_input.pdf")
+        docx_path = os.path.join(TEMP_DIR, f"{unique_id}_output.docx")
+        
+        try:
+            # PDF 파일 저장
+            file.save(pdf_path)
+            
+            # PDF를 DOCX로 변환
+            cv = Converter(pdf_path)
+            cv.convert(docx_path)
+            cv.close()
+            
+            # 변환된 파일 전송
+            return send_file(
+                docx_path,
+                as_attachment=True,
+                download_name=os.path.splitext(file.filename)[0] + '.docx',
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+        finally:
+            # 임시 파일 삭제
+            try:
+                if os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                if os.path.exists(docx_path):
+                    os.remove(docx_path)
+            except Exception as e:
+                print(f"Error cleaning up temporary files: {e}")
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/convert/pdf-to-hwp', methods=['POST'])
+def pdf_to_hwp():
+    hwp = None
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 고유한 임시 파일 경로 생성
+        unique_id = str(uuid.uuid4())
+        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_input.pdf")
+        docx_path = os.path.join(TEMP_DIR, f"{unique_id}_temp.docx")
+        hwp_path = os.path.join(TEMP_DIR, f"{unique_id}_output.hwp")
+        
+        try:
+            # PDF 파일 저장
+            file.save(pdf_path)
+            
+            # PDF를 DOCX로 변환
+            cv = Converter(pdf_path)
+            cv.convert(docx_path)
+            cv.close()
+            
+            # DOCX를 HWP로 변환
+            hwp = init_hwp()
+            
+            # 파일 경로를 전체 경로로 변환
+            abs_docx_path = os.path.abspath(docx_path)
+            abs_hwp_path = os.path.abspath(hwp_path)
+            
+            # 파일 열기
+            hwp.Open(abs_docx_path)
+            time.sleep(1)  # 파일이 완전히 열릴 때까지 대기
+            
+            # HWP로 저장
+            hwp.SaveAs(abs_hwp_path, "HWP")
+            time.sleep(1)  # 저장이 완료될 때까지 대기
+            
+            # 변환된 파일 전송
+            if os.path.exists(hwp_path):
+                return send_file(
+                    hwp_path,
+                    as_attachment=True,
+                    download_name=os.path.splitext(file.filename)[0] + '.hwp',
+                    mimetype='application/x-hwp'
+                )
+            else:
+                return jsonify({'error': 'HWP conversion failed - File not created'}), 500
+                
+        finally:
+            # 한글 종료
+            if hwp:
+                quit_hwp(hwp)
+            
+            # 임시 파일 삭제
+            try:
+                for path in [pdf_path, docx_path, hwp_path]:
+                    if os.path.exists(path):
+                        os.remove(path)
+            except Exception as e:
+                print(f"Error cleaning up temporary files: {e}")
+                    
+    except Exception as e:
+        print(f"PDF to HWP conversion error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/convert/hwp-to-pdf', methods=['POST'])
+def hwp_to_pdf():
+    hwp = None
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 고유한 임시 파일 경로 생성
+        unique_id = str(uuid.uuid4())
+        hwp_path = os.path.join(TEMP_DIR, f"{unique_id}_input.hwp")
+        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_output.pdf")
+        
+        try:
+            # HWP 파일 저장
+            file.save(hwp_path)
+            
+            # HWP를 PDF로 변환
+            hwp = init_hwp()
+            
+            # 파일 경로를 전체 경로로 변환
+            abs_hwp_path = os.path.abspath(hwp_path)
+            abs_pdf_path = os.path.abspath(pdf_path)
+            
+            # 파일 열기
+            hwp.Open(abs_hwp_path)
+            time.sleep(1)  # 파일이 완전히 열릴 때까지 대기
+            
+            # PDF로 저장
+            hwp.SaveAs(abs_pdf_path, "PDF")
+            time.sleep(1)  # 저장이 완료될 때까지 대기
+            
+            # 변환된 파일 전송
+            if os.path.exists(pdf_path):
+                return send_file(
+                    pdf_path,
+                    as_attachment=True,
+                    download_name=os.path.splitext(file.filename)[0] + '.pdf',
+                    mimetype='application/pdf'
+                )
+            else:
+                return jsonify({'error': 'PDF conversion failed - File not created'}), 500
+                
+        finally:
+            # 한글 종료
+            if hwp:
+                quit_hwp(hwp)
+            
+            # 임시 파일 삭제
+            try:
+                for path in [hwp_path, pdf_path]:
+                    if os.path.exists(path):
+                        os.remove(path)
+            except Exception as e:
+                print(f"Error cleaning up temporary files: {e}")
+                    
+    except Exception as e:
+        print(f"HWP to PDF conversion error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/pdf-to-image', methods=['POST'])
+def convert_pdf_to_image():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        format = request.form.get('format', 'jpg')
+        if format not in ['jpg', 'png']:
+            return jsonify({'error': 'Invalid format'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
+        file.save(input_path)
+        
+        try:
+            # PDF를 이미지로 변환
+            output_path = image_converter.pdf_to_image(input_path, format)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.{format}",
+                mimetype=f'image/{format}'
+            )
+        finally:
+            # 임시 파일 삭제
+            image_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/image-to-pdf', methods=['POST'])
+def convert_image_to_pdf():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input{os.path.splitext(file.filename)[1]}")
+        file.save(input_path)
+        
+        try:
+            # 이미지를 PDF로 변환
+            output_path = image_converter.image_to_pdf(input_path)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+                mimetype='application/pdf'
+            )
+        finally:
+            # 임시 파일 삭제
+            image_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/pdf-to-doc', methods=['POST'])
+def convert_pdf_to_doc():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
+        file.save(input_path)
+        
+        try:
+            # PDF를 Word로 변환
+            output_path = document_converter.pdf_to_doc(input_path)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.docx",
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+        finally:
+            # 임시 파일 삭제
+            document_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/doc-to-pdf', methods=['POST'])
+def convert_doc_to_pdf():
+    input_path = None
+    output_path = None
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.docx")
+        file.save(input_path)
+        
+        # Word를 PDF로 변환
+        output_path = document_converter.doc_to_pdf(input_path)
+        
+        # 변환된 파일 전송
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        # 임시 파일 삭제
+        if input_path or output_path:
+            document_converter.cleanup(input_path, output_path)
+
+@app.route('/api/convert/pdf-to-hwp', methods=['POST'])
+def convert_pdf_to_hwp():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
+        file.save(input_path)
+        
+        try:
+            # PDF를 HWP로 변환
+            output_path = hwp_converter.pdf_to_hwp(input_path)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.hwp",
+                mimetype='application/x-hwp'
+            )
+        finally:
+            # 임시 파일 삭제
+            hwp_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/hwp-to-pdf', methods=['POST'])
+def convert_hwp_to_pdf():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.lower().endswith('.hwp'):
+            return jsonify({'error': 'Invalid file format. Please upload an HWP file.'}), 400
+        
+        # 파일 저장
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(TEMP_DIR, filename)
+        file.save(temp_path)
+        
+        # 파일 변환
+        output_path = hwp_converter.hwp_to_pdf(temp_path)
+        
+        # 임시 파일 정리
+        hwp_converter.cleanup(temp_path)
+        
+        return jsonify({'path': output_path})
+        
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/api/convert/pdf-to-excel', methods=['POST'])
+def convert_pdf_to_excel():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 옵션 가져오기
+        preserve_formatting = request.form.get('preserveFormatting', 'true').lower() == 'true'
+        detect_tables = request.form.get('detectTables', 'true').lower() == 'true'
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
+        file.save(input_path)
+        
+        try:
+            # PDF를 Excel로 변환
+            output_path = excel_converter.pdf_to_excel(
+                input_path,
+                preserve_formatting=preserve_formatting,
+                detect_tables=detect_tables
+            )
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.xlsx",
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        finally:
+            # 임시 파일 삭제
+            excel_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/excel-to-pdf', methods=['POST'])
+def convert_excel_to_pdf():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.xlsx")
+        file.save(input_path)
+        
+        try:
+            # Excel을 PDF로 변환
+            output_path = excel_converter.excel_to_pdf(input_path)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+                mimetype='application/pdf'
+            )
+        finally:
+            # 임시 파일 삭제
+            excel_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/pdf-to-ppt', methods=['POST'])
+def convert_pdf_to_ppt():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 옵션 가져오기
+        extract_images = request.form.get('extractImages', 'true').lower() == 'true'
+        preserve_layout = request.form.get('preserveLayout', 'true').lower() == 'true'
+        create_animations = request.form.get('createAnimations', 'false').lower() == 'true'
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
+        file.save(input_path)
+        
+        try:
+            # PDF를 PowerPoint로 변환
+            output_path = powerpoint_converter.pdf_to_ppt(
+                input_path,
+                extract_images=extract_images,
+                preserve_layout=preserve_layout,
+                create_animations=create_animations
+            )
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.pptx",
+                mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+            )
+        finally:
+            # 임시 파일 삭제
+            powerpoint_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/convert/ppt-to-pdf', methods=['POST'])
+def convert_ppt_to_pdf():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 임시 파일 저장
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pptx")
+        file.save(input_path)
+        
+        try:
+            # PowerPoint를 PDF로 변환
+            output_path = powerpoint_converter.ppt_to_pdf(input_path)
+            
+            # 변환된 파일 전송
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+                mimetype='application/pdf'
+            )
+        finally:
+            # 임시 파일 삭제
+            powerpoint_converter.cleanup(input_path, output_path)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/download')
+def download_file():
+    try:
+        file_path = request.args.get('path')
+        if not file_path or not os.path.exists(file_path):
+            return 'File not found', 404
+            
+        return send_file(file_path, as_attachment=True)
+        
+    except Exception as e:
+        return str(e), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

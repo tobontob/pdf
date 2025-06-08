@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이미지 변환 - PDF 변환 도구</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .nav-link {
+            color: #495057;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: #0d6efd;
+        }
+        .nav-link.active {
+            color: #0d6efd !important;
+        }
+        .drop-zone {
+            border: 2px dashed #0d6efd;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        .drop-zone:hover {
+            background: #e9ecef;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background: #e9ecef;
+            border-color: #0b5ed7;
+        }
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">PDF 변환 도구</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/image">이미지 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/document">문서 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/hwp">한글 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/excel">엑셀 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/powerpoint">파워포인트 변환</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-5">
+                        <h2 class="text-center mb-4">이미지 변환</h2>
+                        
+                        <!-- Conversion Options -->
+                        <div class="mb-4">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="conversionType" id="pdfToImage" value="pdfToImage" checked>
+                                <label class="form-check-label" for="pdfToImage">PDF → 이미지</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="conversionType" id="imageToPdf" value="imageToPdf">
+                                <label class="form-check-label" for="imageToPdf">이미지 → PDF</label>
+                            </div>
+                        </div>
+
+                        <!-- File Drop Zone -->
+                        <div class="drop-zone mb-4" id="dropZone">
+                            <i class="bi bi-cloud-arrow-up display-4 mb-3"></i>
+                            <h5>파일을 드래그하거나 클릭하여 업로드</h5>
+                            <p class="text-muted mb-0">지원 형식: PDF, JPG, PNG</p>
+                            <input type="file" id="fileInput" class="d-none" accept=".pdf,image/*">
+                            <img id="previewImage" class="preview-image d-none">
+                        </div>
+
+                        <!-- Image Format Selection (for PDF to Image) -->
+                        <div class="mb-4" id="imageFormatSelect">
+                            <label class="form-label">이미지 형식 선택</label>
+                            <select class="form-select">
+                                <option value="jpg">JPG</option>
+                                <option value="png">PNG</option>
+                            </select>
+                        </div>
+
+                        <!-- Convert Button -->
+                        <button class="btn btn-primary w-100" id="convertBtn">
+                            변환하기
+                        </button>
+
+                        <!-- Progress -->
+                        <div class="progress mt-3 d-none" id="progressBar">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                        </div>
+
+                        <!-- Status Message -->
+                        <div class="alert mt-3 d-none" id="statusMessage"></div>
+
+                        <!-- Download Button -->
+                        <a href="#" class="btn btn-success w-100 mt-3 d-none" id="downloadBtn">
+                            변환된 파일 다운로드
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='js/image-converter.js') }}"></script>
+</body>
+</html> 

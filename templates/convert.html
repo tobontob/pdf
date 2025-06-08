@@ -4,65 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF 변환기</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- 외부 라이브러리 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    
+    <!-- PDF 변환 라이브러리들 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.9/docxtemplater.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip-utils.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
-    <!-- 커스텀 스크립트 -->
-    <script src="{{ url_for('static', filename='js/pdf-converter.js') }}" defer></script>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        .container {
+            max-width: 800px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        .file-types {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+        .btn-convert {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            border: none;
+            transition: transform 0.2s;
+        }
+        .btn-convert:hover {
+            transform: translateY(-2px);
+        }
+        .btn-download {
+            background: linear-gradient(45deg, #28a745, #1e7e34);
+            border: none;
+            transition: transform 0.2s;
+        }
+        .btn-download:hover {
+            transform: translateY(-2px);
+        }
+        .progress {
+            height: 10px;
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>PDF 변환기</h1>
-        <div class="description">
-            <p>PDF 파일을 이미지나 문서로 변환하거나, 이미지와 문서를 PDF로 변환할 수 있습니다.</p>
-            <ul>
-                <li>PDF → 이미지 (JPG, PNG, WebP)</li>
-                <li>PDF → 문서 (Word, 텍스트)</li>
-                <li>이미지 → PDF</li>
-                <li>문서 → PDF</li>
-            </ul>
-        </div>
-        
-        <form id="convertForm" class="convert-form">
-            <div class="form-group">
-                <label for="fileInput">파일 선택:</label>
-                <div class="file-input-wrapper">
-                    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" required>
-                    <div class="file-types">
-                        지원 형식: PDF, JPG, PNG, WebP, DOC, DOCX, TXT
-                    </div>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="text-center mb-4">PDF 변환기</h1>
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="mb-4">
+                    <h5>지원하는 변환 형식</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li>✓ PDF → Word (DOCX)</li>
+                        <li>✓ PDF → 한글 (HWP)</li>
+                        <li>✓ PDF → 이미지 (JPG, PNG)</li>
+                        <li>✓ 이미지 → PDF</li>
+                        <li>✓ 한글 → PDF</li>
+                    </ul>
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label for="formatSelect">변환 형식:</label>
-                <select id="formatSelect" required>
-                    <option value="">파일을 먼저 선택해주세요</option>
-                </select>
-            </div>
-
-            <button type="submit" id="convertButton">
-                <span class="button-text">변환하기</span>
-                <span class="button-icon">→</span>
-            </button>
-        </form>
-
-        <div id="progressBar" class="progress-bar" style="display: none;">
-            <div class="progress-spinner"></div>
-            <div class="progress-text">변환 중...</div>
         </div>
-
-        <a id="downloadLink" class="download-link" style="display: none;" download>
-            <span class="download-icon">↓</span>
-            <span class="download-text">변환된 파일 다운로드</span>
-        </a>
+        
+        <div class="card">
+            <div class="card-body">
+                <form id="convertForm">
+                    <div class="mb-3">
+                        <label for="fileInput" class="form-label">파일 선택</label>
+                        <input type="file" class="form-control" id="fileInput" accept=".pdf,.hwp,.doc,.docx,image/*">
+                        <div class="file-types">
+                            지원 형식: PDF, JPG, PNG, DOC, DOCX, HWP
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="formatSelect" class="form-label">변환 형식</label>
+                        <select class="form-select" id="formatSelect">
+                            <option value="">변환 형식 선택</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 btn-convert">
+                        변환하기
+                    </button>
+                </form>
+                
+                <div class="progress mt-3" style="display: none;" id="progressBar">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+                
+                <div id="statusMessage" class="alert mt-3" style="display: none;"></div>
+                
+                <a href="#" class="btn btn-success w-100 mt-3 btn-download" style="display: none;" id="downloadLink">
+                    변환된 파일 다운로드
+                </a>
+            </div>
+        </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/pdf-converter.js') }}"></script>
 </body>
 </html> 
