@@ -5,40 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF 변환기</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- PDF.js CDN -->
+    <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- jsPDF CDN -->
+    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- docx -->
+    <script src="https://unpkg.com/docx@8.2.3/build/index.min.js"></script>
+    <!-- mammoth.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <!-- 커스텀 스크립트 -->
     <script type="module" src="{{ url_for('static', filename='js/pdf-converter.js') }}"></script>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <div class="container">
         <h1>PDF 변환기</h1>
+        <div class="description">
+            <p>PDF 파일을 이미지나 문서로 변환하거나, 이미지와 문서를 PDF로 변환할 수 있습니다.</p>
+            <ul>
+                <li>PDF → 이미지 (JPG, PNG, WebP)</li>
+                <li>PDF → 문서 (Word, 텍스트)</li>
+                <li>이미지 → PDF</li>
+                <li>문서 → PDF</li>
+            </ul>
+        </div>
+        
         <form id="convertForm" class="convert-form">
             <div class="form-group">
                 <label for="fileInput">파일 선택:</label>
-                <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" required>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.txt" required>
+                    <div class="file-types">
+                        지원 형식: PDF, JPG, PNG, WebP, DOC, DOCX, TXT
+                    </div>
+                </div>
             </div>
             
             <div class="form-group">
                 <label for="formatSelect">변환 형식:</label>
                 <select id="formatSelect" required>
-                    <option value="">변환 형식 선택</option>
-                    <option value="jpg">JPG</option>
-                    <option value="png">PNG</option>
-                    <option value="pdf">PDF</option>
+                    <option value="">파일을 먼저 선택해주세요</option>
                 </select>
             </div>
 
-            <button type="submit" id="convertButton">변환하기</button>
+            <button type="submit" id="convertButton">
+                <span class="button-text">변환하기</span>
+                <span class="button-icon">→</span>
+            </button>
         </form>
 
         <div id="progressBar" class="progress-bar" style="display: none;">
+            <div class="progress-spinner"></div>
             <div class="progress-text">변환 중...</div>
         </div>
 
-        <a id="downloadLink" style="display: none;" download>다운로드</a>
+        <a id="downloadLink" class="download-link" style="display: none;" download>
+            <span class="download-icon">↓</span>
+            <span class="download-text">변환된 파일 다운로드</span>
+        </a>
     </div>
 </body>
 </html> 

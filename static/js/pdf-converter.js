@@ -34,6 +34,50 @@ class PDFConverter {
         }
     }
 
+    // PDF를 텍스트로 변환 (txt 변환용)
+    static async pdfToText(pdfFile) {
+        try {
+            const arrayBuffer = await pdfFile.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n\n';
+            }
+
+            return fullText;
+        } catch (error) {
+            console.error('PDF to Text conversion failed:', error);
+            throw error;
+        }
+    }
+
+    // PDF를 Word로 변환 (docx 변환용)
+    static async pdfToWord(pdfFile) {
+        try {
+            const text = await this.pdfToText(pdfFile);
+            const doc = new docx.Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        new docx.Paragraph({
+                            children: [new docx.TextRun(text)],
+                        }),
+                    ],
+                }],
+            });
+
+            const blob = await docx.Packer.toBlob(doc);
+            return blob;
+        } catch (error) {
+            console.error('PDF to Word conversion failed:', error);
+            throw error;
+        }
+    }
+
     // 이미지를 PDF로 변환
     static async imageToPDF(imageFile) {
         try {
@@ -74,6 +118,46 @@ class PDFConverter {
             });
         } catch (error) {
             console.error('Image to PDF conversion failed:', error);
+            throw error;
+        }
+    }
+
+    // 텍스트를 PDF로 변환
+    static async textToPDF(textContent) {
+        try {
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 10;
+            const fontSize = 12;
+            
+            doc.setFontSize(fontSize);
+            const lines = doc.splitTextToSize(textContent, pageWidth - 2 * margin);
+            
+            let y = margin;
+            lines.forEach(line => {
+                if (y > doc.internal.pageSize.getHeight() - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
+                doc.text(line, margin, y);
+                y += fontSize;
+            });
+
+            return doc.output('blob');
+        } catch (error) {
+            console.error('Text to PDF conversion failed:', error);
+            throw error;
+        }
+    }
+
+    // Word를 PDF로 변환
+    static async wordToPDF(wordFile) {
+        try {
+            const arrayBuffer = await wordFile.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            return await this.textToPDF(result.value);
+        } catch (error) {
+            console.error('Word to PDF conversion failed:', error);
             throw error;
         }
     }
