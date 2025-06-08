@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"  # Flask 앱
+      - "5900:5900"  # VNC
+      - "6080:6080"  # noVNC 웹 인터페이스
+    environment:
+      - DISPLAY=:99
+      - HANCOM_WORKS_URL=${HANCOM_WORKS_URL}
+      - HANCOM_USER_ID=${HANCOM_USER_ID}
+      - HANCOM_USER_PW=${HANCOM_USER_PW}
+    volumes:
+      - ./temp:/app/temp
+    restart: unless-stopped 

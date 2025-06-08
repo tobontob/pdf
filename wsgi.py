@@ -3,17 +3,11 @@ import os
 import tempfile
 from werkzeug.utils import secure_filename
 from pdf2docx import Converter
-import pythoncom
-import win32com.client as win32
 from pathlib import Path
 import uuid
 import sys
-import win32gui
-import win32con
-import time
 from converters.image_converter import ImageConverter
 from converters.document_converter import DocumentConverter
-from converters.hwp_converter import HwpConverter
 from converters.excel_converter import ExcelConverter
 from converters.powerpoint_converter import PowerPointConverter
 
@@ -31,29 +25,8 @@ if not os.path.exists(TEMP_DIR):
 # 변환기 인스턴스 생성
 image_converter = ImageConverter()
 document_converter = DocumentConverter()
-hwp_converter = HwpConverter()
 excel_converter = ExcelConverter()
 powerpoint_converter = PowerPointConverter()
-
-def init_hwp():
-    """한글 객체 초기화"""
-    try:
-        pythoncom.CoInitialize()
-        hwp = win32.Dispatch("HWPFrame.HwpObject")
-        hwp.XHwpWindows.Item(0).Visible = False
-        hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        return hwp
-    except Exception as e:
-        print(f"Error initializing HWP: {e}")
-        raise
-
-def quit_hwp(hwp):
-    """한글 객체 종료"""
-    try:
-        hwp.Quit()
-        pythoncom.CoUninitialize()
-    except:
-        pass
 
 @app.route('/')
 def index():
@@ -66,10 +39,6 @@ def image_converter_page():
 @app.route('/document')
 def document_converter_page():
     return render_template('document.html')
-
-@app.route('/hwp')
-def hwp_converter_page():
-    return render_template('hwp.html')
 
 @app.route('/excel')
 def excel_converter_page():
