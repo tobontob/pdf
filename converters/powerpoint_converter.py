@@ -1,12 +1,15 @@
+# 기존 코드를 모두 지우고 아래 코드로 교체해주세요
+
 import os
-import tempfile
 import uuid
-import win32com.client
-import pythoncom
-from pdf2image import convert_from_path
+import tempfile
+import time
 from pptx import Presentation
 from pptx.util import Inches
-import time
+from pdf2image import convert_from_path
+import win32com.client
+import pythoncom
+import shutil
 
 class PowerPointConverter:
     def __init__(self):
@@ -60,20 +63,28 @@ class PowerPointConverter:
             output_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.pptx")
             
             # PDF를 이미지로 변환 (Poppler 경로 설정)
-            poppler_path = r'C:\poppler-24.06.0-0\Library\bin'  # 압축을 푼 Poppler 경로로 수정
-            
-            # Poppler 경로가 유효한지 확인
-            if not os.path.exists(poppler_path):
+            poppler_paths = [
+                r'C:\poppler-24.08.0\Library\bin',  # 기본 설치 경로
+                r'C:\Program Files\poppler-24.08.0\Library\bin',  # 대체 설치 경로
+                r'C:\poppler\bin'  # 수동 설치 경로
+            ]
+
+            poppler_path = None
+            for path in poppler_paths:
+                if os.path.exists(path):
+                    poppler_path = path
+                    break
+
+            if poppler_path is None:
                 # 환경 변수에서 Poppler 경로 찾기
-                poppler_path = None
                 for path in os.environ['PATH'].split(os.pathsep):
                     if 'poppler' in path.lower() and os.path.exists(path):
                         poppler_path = path
                         break
-                
-                if poppler_path is None:
-                    raise Exception("Poppler not found. Please install Poppler and add it to PATH")
-            
+
+            if poppler_path is None:
+                raise Exception("Poppler not found. Please install Poppler and add it to PATH")
+
             images = convert_from_path(
                 pdf_path,
                 poppler_path=poppler_path,
@@ -102,11 +113,27 @@ class PowerPointConverter:
                 blank_slide_layout = prs.slide_layouts[6]  # 6은 빈 슬라이드
                 slide = prs.slides.add_slide(blank_slide_layout)
                 
-                # 이미지 추가 (슬라이드 크기에 맞게 조정)
-                left = top = Inches(0)
+                # 이미지 크기 조정 (슬라이드에 맞게)
+                img_width, img_height = img.size
+                slide_width = prs.slide_width
+                slide_height = prs.slide_height
+                
+                # 이미지 비율 유지하면서 슬라이드에 맞게 크기 조정
+                width_ratio = slide_width / img_width
+                height_ratio = slide_height / img_height
+                ratio = min(width_ratio, height_ratio)
+                
+                new_width = img_width * ratio
+                new_height = img_height * ratio
+                
+                # 이미지 위치 조정 (가운데 정렬)
+                left = (slide_width - new_width) / 2
+                top = (slide_height - new_height) / 2
+                
+                # 슬라이드에 이미지 추가
                 slide.shapes.add_picture(img_path, left, top, 
-                                       width=prs.slide_width, 
-                                       height=prs.slide_height)
+                                       width=new_width, 
+                                       height=new_height)
             
             # 프레젠테이션 저장
             prs.save(output_path)
@@ -127,13 +154,12 @@ class PowerPointConverter:
     def ppt_to_pdf(self, ppt_path):
         """PowerPoint를 PDF로 변환"""
         try:
-            # 임시 파일 경로 생성
-            output_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.pdf")
-            
-            # PowerPoint 초기화
             self.init_powerpoint()
             
             try:
+                # PDF 출력 경로 생성
+                output_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.pdf")
+                
                 # PowerPoint 파일 열기 (ReadOnly로 열어서 창이 보이지 않도록 함)
                 presentation = self.ppt.Presentations.Open(
                     FileName=os.path.abspath(ppt_path),
@@ -151,43 +177,24 @@ class PowerPointConverter:
                 # 저장이 완료될 때까지 대기
                 time.sleep(1)
                 
-                # 파일이 제대로 생성되었는지 확인
-                if not os.path.exists(output_path):
-                    raise Exception("Failed to generate PDF file")
-                
                 return output_path
                 
             except Exception as e:
-                # 변환 중 오류 발생 시 생성된 파일 삭제
-                if os.path.exists(output_path):
-                    try:
-                        os.unlink(output_path)
-                    except:
-                        pass
-                raise e
-                
+                raise Exception(f"Failed to convert PowerPoint to PDF: {str(e)}")
             finally:
-                # 프레젠테이션 닫기
                 try:
-                    if 'presentation' in locals():
-                        presentation.Close()
+                    presentation.Close()
                 except:
                     pass
-                    
         except Exception as e:
-            raise Exception(f"PowerPoint to PDF conversion failed: {str(e)}")
+            raise Exception(f"PowerPoint initialization failed: {str(e)}")
         finally:
             self.close_powerpoint()
 
-    def cleanup(self, *file_paths):
+    def cleanup(self):
         """임시 파일 정리"""
-        for file_path in file_paths:
-            try:
-                if file_path and os.path.exists(file_path):
-                    os.unlink(file_path)
-            except Exception as e:
-                print(f"Error deleting file {file_path}: {str(e)}")
-
-    def __del__(self):
-        """소멸자에서 리소스 정리"""
-        self.close_powerpoint()
+        try:
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+        except Exception as e:
+            print(f"Error cleaning up temporary files: {str(e)}")
