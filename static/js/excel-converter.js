@@ -110,10 +110,15 @@ class ExcelConverter {
 
     async convertFile() {
         const file = this.fileInput.files[0];
-        if (!file) return;
+        if (!file) {
+            this.showStatus('파일을 선택해주세요.', 'error');
+            return;
+        }
 
         const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
-        const endpoint = conversionType === 'pdfToExcel' ? '/api/convert/pdf-to-excel' : '/api/convert/excel-to-pdf';
+        const endpoint = conversionType === 'pdfToExcel' 
+            ? '/api/convert/pdf-to-excel' 
+            : '/api/convert/excel-to-pdf';
 
         const formData = new FormData();
         formData.append('file', file);
@@ -136,20 +141,32 @@ class ExcelConverter {
             });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.error || '변환 중 오류가 발생했습니다.');
             }
 
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             
+            const outputFilename = `${file.name.split('.')[0]}.${conversionType === 'pdfToExcel' ? 'xlsx' : 'pdf'}`;
+            
+            // 다운로드 링크 업데이트
             this.downloadBtn.href = url;
-            this.downloadBtn.download = `${file.name.split('.')[0]}.${conversionType === 'pdfToExcel' ? 'xlsx' : 'pdf'}`;
+            this.downloadBtn.download = outputFilename;
             this.downloadBtn.classList.remove('d-none');
-            this.showStatus('변환이 완료되었습니다!', 'success');
+            
+            // 다운로드 자동 실행
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outputFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            this.showStatus('변환 및 다운로드가 완료되었습니다!', 'success');
         } catch (error) {
             console.error('Conversion failed:', error);
-            this.showStatus(error.message, 'error');
+            this.showStatus(`변환 실패: ${error.message}`, 'error');
         } finally {
             this.progressBar.classList.add('d-none');
             this.convertBtn.disabled = false;
