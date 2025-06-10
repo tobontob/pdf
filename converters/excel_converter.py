@@ -2,9 +2,10 @@ import os
 import tempfile
 import uuid
 import win32com.client
-import tabula
 import pandas as pd
 import time
+from pdf2docx import Converter
+from docx import Document
 
 class ExcelConverter:
     def __init__(self):
@@ -33,44 +34,46 @@ class ExcelConverter:
 
     def pdf_to_excel(self, pdf_path, preserve_formatting=True, detect_tables=True):
         """PDF를 Excel 문서로 변환"""
+        temp_docx = None
         try:
             # 임시 파일 경로 생성
             output_path = os.path.join(self.temp_dir, f"{uuid.uuid4()}_output.xlsx")
+            temp_docx = os.path.join(self.temp_dir, f"{uuid.uuid4()}_temp.docx")
             
-            if detect_tables:
-                # tabula-py를 사용하여 PDF에서 표 추출
-                tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
-                
-                # 여러 시트에 표 저장
-                with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-                    for i, table in enumerate(tables):
-                        sheet_name = f'Table {i+1}' if len(tables) > 1 else 'Sheet1'
-                        table.to_excel(writer, sheet_name=sheet_name, index=False)
-            else:
-                # 단순 텍스트 추출 및 저장
-                tables = tabula.read_pdf(pdf_path, pages='all', stream=True)
-                with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-                    for i, table in enumerate(tables):
-                        sheet_name = f'Page {i+1}'
-                        table.to_excel(writer, sheet_name=sheet_name, index=False)
+            # PDF를 DOCX로 변환
+            cv = Converter(pdf_path)
+            cv.convert(temp_docx, start=0, end=None)
+            cv.close()
             
-            if preserve_formatting:
-                # Excel을 사용하여 서식 개선
-                self.init_excel()
-                workbook = self.excel.Workbooks.Open(output_path)
-                
-                for sheet in workbook.Sheets:
-                    sheet.Columns.AutoFit()
-                    sheet.Rows.AutoFit()
-                
-                workbook.Save()
-                workbook.Close()
+            # DOCX에서 텍스트 추출
+            doc = Document(temp_docx)
             
+            # DataFrame 생성
+            data = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    data.append([para.text])
+            
+            # DataFrame을 Excel로 저장
+            df = pd.DataFrame(data, columns=['Text'])
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            
+            # 파일이 제대로 생성되었는지 확인
+            if not os.path.exists(output_path):
+                raise Exception("Failed to generate Excel file")
+                
             return output_path
+            
         except Exception as e:
             raise Exception(f"PDF to Excel conversion failed: {str(e)}")
         finally:
             self.close_excel()
+            # 임시 파일 정리
+            if temp_docx and os.path.exists(temp_docx):
+                try:
+                    os.unlink(temp_docx)
+                except:
+                    pass
 
     def excel_to_pdf(self, excel_path):
         """Excel 문서를 PDF로 변환"""
@@ -99,14 +102,15 @@ class ExcelConverter:
             self.close_excel()
 
     def cleanup(self, *file_paths):
-        """임시 파일 삭제"""
-        for path in file_paths:
+        """임시 파일 정리"""
+        for file_path in file_paths:
             try:
-                if os.path.exists(path):
-                    os.remove(path)
+                if file_path and os.path.exists(file_path):
+                    os.unlink(file_path)
             except Exception as e:
-                print(f"Error cleaning up file {path}: {e}")
+                print(f"Error deleting file {file_path}: {str(e)}")
+                continue
 
     def __del__(self):
         """소멸자에서 Excel 객체 정리"""
-        self.close_excel() 
+        self.close_excel()
