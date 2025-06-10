@@ -2,6 +2,7 @@ import os
 import tempfile
 import uuid
 import win32com.client
+import pythoncom
 import pandas as pd
 import time
 from pdf2docx import Converter
@@ -15,13 +16,24 @@ class ExcelConverter:
         
         # Excel 인스턴스 초기화
         self.excel = None
+        self.com_initialized = False
 
     def init_excel(self):
         """Excel 객체 초기화"""
         if self.excel is None:
-            self.excel = win32com.client.Dispatch("Excel.Application")
-            self.excel.Visible = False
-            self.excel.DisplayAlerts = False
+            try:
+                # COM 초기화
+                pythoncom.CoInitialize()
+                self.com_initialized = True
+                
+                self.excel = win32com.client.Dispatch("Excel.Application")
+                self.excel.Visible = False
+                self.excel.DisplayAlerts = False
+            except Exception as e:
+                if self.com_initialized:
+                    pythoncom.CoUninitialize()
+                    self.com_initialized = False
+                raise e
 
     def close_excel(self):
         """Excel 객체 종료"""
@@ -29,8 +41,12 @@ class ExcelConverter:
             if self.excel:
                 self.excel.Quit()
                 self.excel = None
-        except:
-            pass
+        except Exception as e:
+            print(f"Error closing Excel: {str(e)}")
+        finally:
+            if self.com_initialized:
+                pythoncom.CoUninitialize()
+                self.com_initialized = False
 
     def pdf_to_excel(self, pdf_path, preserve_formatting=True, detect_tables=True):
         """PDF를 Excel 문서로 변환"""
@@ -67,7 +83,6 @@ class ExcelConverter:
         except Exception as e:
             raise Exception(f"PDF to Excel conversion failed: {str(e)}")
         finally:
-            self.close_excel()
             # 임시 파일 정리
             if temp_docx and os.path.exists(temp_docx):
                 try:
@@ -84,18 +99,39 @@ class ExcelConverter:
             # Excel 초기화
             self.init_excel()
             
-            # Excel 파일 열기
-            workbook = self.excel.Workbooks.Open(excel_path)
-            
-            # PDF로 저장
-            workbook.ExportAsFixedFormat(0, output_path)  # 0 = PDF 형식
-            
-            # 저장이 완료될 때까지 대기
-            time.sleep(1)
-            
-            workbook.Close()
-            
-            return output_path
+            try:
+                # Excel 파일 열기
+                workbook = self.excel.Workbooks.Open(os.path.abspath(excel_path))
+                
+                # PDF로 저장
+                workbook.ExportAsFixedFormat(0, os.path.abspath(output_path))  # 0 = PDF 형식
+                
+                # 저장이 완료될 때까지 대기
+                time.sleep(1)
+                
+                # 파일이 제대로 생성되었는지 확인
+                if not os.path.exists(output_path):
+                    raise Exception("Failed to generate PDF file")
+                
+                return output_path
+                
+            except Exception as e:
+                # 변환 중 오류 발생 시 생성된 파일 삭제
+                if os.path.exists(output_path):
+                    try:
+                        os.unlink(output_path)
+                    except:
+                        pass
+                raise e
+                
+            finally:
+                # 워크북 닫기
+                try:
+                    if 'workbook' in locals():
+                        workbook.Close(False)
+                except:
+                    pass
+                    
         except Exception as e:
             raise Exception(f"Excel to PDF conversion failed: {str(e)}")
         finally:
@@ -109,8 +145,7 @@ class ExcelConverter:
                     os.unlink(file_path)
             except Exception as e:
                 print(f"Error deleting file {file_path}: {str(e)}")
-                continue
 
     def __del__(self):
-        """소멸자에서 Excel 객체 정리"""
+        """소멸자에서 리소스 정리"""
         self.close_excel()

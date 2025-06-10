@@ -488,109 +488,147 @@ def convert_pdf_to_excel():
 
 @app.route('/api/convert/excel-to-pdf', methods=['POST'])
 def convert_excel_to_pdf():
+    output_path = None
+    input_path = None
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
-        
+            
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
+            
+        # 파일 확장자 확인
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({'error': 'Invalid file format. Please upload an Excel file (.xlsx or .xls)'}), 400
         
         # 임시 파일 저장
-        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.xlsx")
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input{os.path.splitext(file.filename)[1]}")
         file.save(input_path)
         
-        try:
-            # Excel을 PDF로 변환
-            output_path = excel_converter.excel_to_pdf(input_path)
-            
-            # 변환된 파일 전송
-            return send_file(
-                output_path,
-                as_attachment=True,
-                download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
-                mimetype='application/pdf'
-            )
-        finally:
-            # 임시 파일 삭제
-            excel_converter.cleanup(input_path, output_path)
-            
+        # Excel을 PDF로 변환
+        output_path = excel_converter.excel_to_pdf(input_path)
+        
+        if not output_path or not os.path.exists(output_path):
+            raise Exception("Failed to generate PDF file")
+        
+        # 변환된 파일 전송
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+            mimetype='application/pdf'
+        )
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Excel to PDF conversion error: {str(e)}")
+        return jsonify({'error': f'Excel to PDF conversion failed: {str(e)}'}), 500
+    finally:
+        # 임시 파일 정리
+        try:
+            if input_path and os.path.exists(input_path):
+                os.unlink(input_path)
+            if output_path and os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception as e:
+            app.logger.error(f"Error cleaning up temporary files: {str(e)}")
 
 @app.route('/api/convert/pdf-to-ppt', methods=['POST'])
 def convert_pdf_to_ppt():
+    output_path = None
+    input_path = None
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
-        
+            
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
-        
-        # 옵션 가져오기
-        extract_images = request.form.get('extractImages', 'true').lower() == 'true'
-        preserve_layout = request.form.get('preserveLayout', 'true').lower() == 'true'
-        create_animations = request.form.get('createAnimations', 'false').lower() == 'true'
+            
+        # 파일 확장자 확인
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Invalid file format. Please upload a PDF file'}), 400
         
         # 임시 파일 저장
         input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
         file.save(input_path)
         
-        try:
-            # PDF를 PowerPoint로 변환
-            output_path = powerpoint_converter.pdf_to_ppt(
-                input_path,
-                extract_images=extract_images,
-                preserve_layout=preserve_layout,
-                create_animations=create_animations
-            )
-            
-            # 변환된 파일 전송
-            return send_file(
-                output_path,
-                as_attachment=True,
-                download_name=f"{os.path.splitext(file.filename)[0]}.pptx",
-                mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
-            )
-        finally:
-            # 임시 파일 삭제
-            powerpoint_converter.cleanup(input_path, output_path)
-            
+        # PDF를 PPT로 변환
+        output_path = powerpoint_converter.pdf_to_ppt(input_path)
+        
+        if not output_path or not os.path.exists(output_path):
+            raise Exception("Failed to generate PPT file")
+        
+        # 변환된 파일 전송
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"{os.path.splitext(file.filename)[0]}.pptx",
+            mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        )
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"PDF to PPT conversion error: {str(e)}")
+        return jsonify({'error': f'PDF to PPT conversion failed: {str(e)}'}), 500
+    finally:
+        # 임시 파일 정리
+        try:
+            if input_path and os.path.exists(input_path):
+                os.unlink(input_path)
+            if output_path and os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception as e:
+            app.logger.error(f"Error cleaning up temporary files: {str(e)}")
 
 @app.route('/api/convert/ppt-to-pdf', methods=['POST'])
 def convert_ppt_to_pdf():
+    output_path = None
+    input_path = None
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
-        
+            
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
+            
+        # 파일 확장자 확인
+        if not file.filename.lower().endswith(('.ppt', '.pptx')):
+            return jsonify({'error': 'Invalid file format. Please upload a PowerPoint file (.ppt or .pptx)'}), 400
         
         # 임시 파일 저장
-        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pptx")
+        input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input{os.path.splitext(file.filename)[1]}")
         file.save(input_path)
         
-        try:
-            # PowerPoint를 PDF로 변환
-            output_path = powerpoint_converter.ppt_to_pdf(input_path)
-            
-            # 변환된 파일 전송
-            return send_file(
-                output_path,
-                as_attachment=True,
-                download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
-                mimetype='application/pdf'
-            )
-        finally:
-            # 임시 파일 삭제
-            powerpoint_converter.cleanup(input_path, output_path)
-            
+        # PPT를 PDF로 변환
+        output_path = powerpoint_converter.ppt_to_pdf(input_path)
+        
+        if not output_path or not os.path.exists(output_path):
+            raise Exception("Failed to generate PDF file")
+        
+        # 변환된 파일 전송
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"{os.path.splitext(file.filename)[0]}.pdf",
+            mimetype='application/pdf'
+        )
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"PPT to PDF conversion error: {str(e)}")
+        return jsonify({'error': f'PPT to PDF conversion failed: {str(e)}'}), 500
+    finally:
+        # 임시 파일 정리
+        try:
+            if input_path and os.path.exists(input_path):
+                os.unlink(input_path)
+            if output_path and os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception as e:
+            app.logger.error(f"Error cleaning up temporary files: {str(e)}")
 
 @app.route('/api/download')
 def download_file():
