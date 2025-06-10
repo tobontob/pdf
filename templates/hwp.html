@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한글(HWP) 변환 - PDF 변환 도구</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .nav-link {
+            color: #495057;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: #0d6efd;
+        }
+        .nav-link.active {
+            color: #0d6efd !important;
+        }
+        .drop-zone {
+            border: 2px dashed #0d6efd;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        .drop-zone:hover {
+            background: #e9ecef;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background: #e9ecef;
+            border-color: #0b5ed7;
+        }
+        .file-info {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">PDF 변환 도구</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/image">이미지 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/document">문서 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/hwp">한글 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/excel">엑셀 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/powerpoint">파워포인트 변환</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-5">
+                        <h2 class="text-center mb-4">한글(HWP) 변환</h2>
+                        
+                        <!-- Conversion Options -->
+                        <div class="mb-4 text-center">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="conversionType" id="hwpToPdf" value="hwpToPdf" checked>
+                                <label class="form-check-label" for="hwpToPdf">HWP → PDF</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="conversionType" id="pdfToHwp" value="pdfToHwp">
+                                <label class="form-check-label" for="pdfToHwp">PDF → HWP</label>
+                            </div>
+                        </div>
+
+                        <!-- File Drop Zone -->
+                        <div class="drop-zone mb-4" id="dropZone">
+                            <i class="bi bi-file-earmark-text display-4 mb-3"></i>
+                            <h5>파일을 드래그하거나 클릭하여 업로드</h5>
+                            <p class="text-muted mb-0">지원 형식: HWP, HWPX, PDF</p>
+                            <input type="file" id="fileInput" class="d-none" accept=".hwp,.hwpx,.pdf">
+                            <div id="fileInfo" class="file-info"></div>
+                        </div>
+
+                        <!-- Convert Button -->
+                        <button class="btn btn-primary w-100" id="convertBtn" disabled>
+                            변환하기
+                        </button>
+
+                        <!-- Progress -->
+                        <div class="progress mt-3 d-none" id="progressBar">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                        </div>
+
+                        <!-- Status Message -->
+                        <div class="alert mt-3 d-none" id="statusMessage"></div>
+
+                        <!-- Download Button -->
+                        <a href="#" class="btn btn-success w-100 mt-3 d-none" id="downloadBtn">
+                            변환된 파일 다운로드
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const convertBtn = document.getElementById('convertBtn');
+            const progressBar = document.getElementById('progressBar');
+            const statusMessage = document.getElementById('statusMessage');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
+            
+            let selectedFile = null;
+
+            // Handle drag and drop events
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropZone.classList.add('dragover');
+            }
+
+            function unhighlight() {
+                dropZone.classList.remove('dragover');
+            }
+
+
+            // Handle file selection
+            dropZone.addEventListener('click', () => fileInput.click());
+
+
+            fileInput.addEventListener('change', handleFileSelect);
+            dropZone.addEventListener('drop', handleDrop);
+
+            function handleFileSelect(e) {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            }
+
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            }
+
+
+            function handleFiles(files) {
+                selectedFile = files[0];
+                fileInfo.textContent = `선택된 파일: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+                convertBtn.disabled = false;
+            }
+
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+
+            // Handle conversion
+            convertBtn.addEventListener('click', async () => {
+                if (!selectedFile) return;
+
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                
+                const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
+                const endpoint = conversionType === 'hwpToPdf' ? '/convert/hwp-to-pdf' : '/convert/pdf-to-hwp';
+
+                // Show progress
+                progressBar.classList.remove('d-none');
+                statusMessage.classList.add('d-none');
+                downloadBtn.classList.add('d-none');
+                convertBtn.disabled = true;
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || '변환 중 오류가 발생했습니다.');
+                    }
+
+
+                    // Get the filename from the Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'converted_file.pdf';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+
+                    // Create a download link
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('d-none');
+                    
+                    statusMessage.textContent = '변환이 완료되었습니다.';
+                    statusMessage.className = 'alert alert-success mt-3';
+                    statusMessage.classList.remove('d-none');
+                    
+                } catch (error) {
+                    statusMessage.textContent = error.message || '변환 중 오류가 발생했습니다.';
+                    statusMessage.className = 'alert alert-danger mt-3';
+                    statusMessage.classList.remove('d-none');
+                    console.error('Conversion error:', error);
+                } finally {
+                    progressBar.classList.add('d-none');
+                    convertBtn.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -17,4 +17,6 @@ pdfkit==1.0.0
 olefile==0.47
 beautifulsoup4==4.12.3
 pyppeteer==1.0.2
-python-dotenv==1.0.0 
+python-dotenv==1.0.0
+pyhwp==0.3.0
+hwp5txt==0.1.0

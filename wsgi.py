@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, send_from_directory
 import os
 import tempfile
 from werkzeug.utils import secure_filename
@@ -6,6 +6,49 @@ from pdf2docx import Converter
 from pathlib import Path
 import uuid
 import sys
+import shutil
+from io import BytesIO, StringIO
+import subprocess
+from fpdf import FPDF
+import olefile
+import zlib
+import struct
+
+def extract_text_from_hwp(hwp_path):
+    """Extract text from HWP file using olefile"""
+    try:
+        # Open the HWP file using olefile
+        ole = olefile.OleFileIO(hwp_path)
+        
+        # Get the "FileHeader" stream
+        if ole.exists('FileHeader'):
+            header = ole.openstream('FileHeader').read()
+            # Check if this is a valid HWP file
+            if header[36:40] == b'HWP ':
+                # Get the body text sections
+                text = ''
+                for entry in ole.listdir():
+                    # Look for body text sections (starts with 'BodyText')
+                    if entry[0].startswith('BodyText'):
+                        stream = ole.openstream(entry).read()
+                        # Simple text extraction - this is a basic implementation
+                        # and may not work for all HWP files
+                        try:
+                            # Try to decode as UTF-16LE (common for HWP text)
+                            text += stream.decode('utf-16le', errors='ignore')
+                        except:
+                            try:
+                                # Fallback to other encodings if needed
+                                text += stream.decode('euc-kr', errors='ignore')
+                            except:
+                                text += stream.decode('cp949', errors='ignore')
+                return text
+        return ""
+    except Exception as e:
+        print(f"Error extracting text from HWP: {str(e)}")
+        return ""
+
+# Import converters
 from converters.image_converter import ImageConverter
 from converters.document_converter import DocumentConverter
 from converters.excel_converter import ExcelConverter
@@ -47,6 +90,10 @@ def excel_converter_page():
 @app.route('/powerpoint')
 def powerpoint_converter_page():
     return render_template('powerpoint.html')
+
+@app.route('/hwp')
+def hwp_converter_page():
+    return render_template('hwp.html')
 
 @app.route('/convert/pdf-to-docx', methods=['POST'])
 def pdf_to_docx():
@@ -94,135 +141,104 @@ def pdf_to_docx():
 
 @app.route('/convert/pdf-to-hwp', methods=['POST'])
 def pdf_to_hwp():
-    hwp = None
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        # 고유한 임시 파일 경로 생성
-        unique_id = str(uuid.uuid4())
-        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_input.pdf")
-        docx_path = os.path.join(TEMP_DIR, f"{unique_id}_temp.docx")
-        hwp_path = os.path.join(TEMP_DIR, f"{unique_id}_output.hwp")
-        
-        try:
-            # PDF 파일 저장
-            file.save(pdf_path)
-            
-            # PDF를 DOCX로 변환
-            cv = Converter(pdf_path)
-            cv.convert(docx_path)
-            cv.close()
-            
-            # DOCX를 HWP로 변환
-            hwp = init_hwp()
-            
-            # 파일 경로를 전체 경로로 변환
-            abs_docx_path = os.path.abspath(docx_path)
-            abs_hwp_path = os.path.abspath(hwp_path)
-            
-            # 파일 열기
-            hwp.Open(abs_docx_path)
-            time.sleep(1)  # 파일이 완전히 열릴 때까지 대기
-            
-            # HWP로 저장
-            hwp.SaveAs(abs_hwp_path, "HWP")
-            time.sleep(1)  # 저장이 완료될 때까지 대기
-            
-            # 변환된 파일 전송
-            if os.path.exists(hwp_path):
-                return send_file(
-                    hwp_path,
-                    as_attachment=True,
-                    download_name=os.path.splitext(file.filename)[0] + '.hwp',
-                    mimetype='application/x-hwp'
-                )
-            else:
-                return jsonify({'error': 'HWP conversion failed - File not created'}), 500
-                
-        finally:
-            # 한글 종료
-            if hwp:
-                quit_hwp(hwp)
-            
-            # 임시 파일 삭제
-            try:
-                for path in [pdf_path, docx_path, hwp_path]:
-                    if os.path.exists(path):
-                        os.remove(path)
-            except Exception as e:
-                print(f"Error cleaning up temporary files: {e}")
-                    
-    except Exception as e:
-        print(f"PDF to HWP conversion error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+    return jsonify({
+        'error': 'PDF에서 HWP로의 변환은 현재 지원되지 않습니다. 다른 방법을 시도해 주세요.'
+    }), 400
 
 @app.route('/convert/hwp-to-pdf', methods=['POST'])
 def hwp_to_pdf():
-    hwp = None
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({'error': '파일이 제공되지 않았습니다.'}), 400
         
         file = request.files['file']
         if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+        
+        # 파일 확장자 확인
+        filename = secure_filename(file.filename)
+        if not (filename.lower().endswith('.hwp') or filename.lower().endswith('.hwp')):
+            return jsonify({'error': 'HWP 파일만 업로드 가능합니다.'}), 400
         
         # 고유한 임시 파일 경로 생성
         unique_id = str(uuid.uuid4())
-        hwp_path = os.path.join(TEMP_DIR, f"{unique_id}_input.hwp")
-        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_output.pdf")
+        temp_dir = os.path.join(TEMP_DIR, unique_id)
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        input_path = os.path.join(temp_dir, filename)
         
         try:
-            # HWP 파일 저장
-            file.save(hwp_path)
+            # 파일 저장
+            file.save(input_path)
             
-            # HWP를 PDF로 변환
-            hwp = init_hwp()
-            
-            # 파일 경로를 전체 경로로 변환
-            abs_hwp_path = os.path.abspath(hwp_path)
-            abs_pdf_path = os.path.abspath(pdf_path)
-            
-            # 파일 열기
-            hwp.Open(abs_hwp_path)
-            time.sleep(1)  # 파일이 완전히 열릴 때까지 대기
-            
-            # PDF로 저장
-            hwp.SaveAs(abs_pdf_path, "PDF")
-            time.sleep(1)  # 저장이 완료될 때까지 대기
-            
-            # 변환된 파일 전송
-            if os.path.exists(pdf_path):
+            # HWP 파일에서 텍스트 추출
+            try:
+                # Extract text from HWP file
+                hwp_text = extract_text_from_hwp(input_path)
+                
+                if not hwp_text.strip():
+                    raise Exception("HWP 파일에서 텍스트를 추출할 수 없습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.")
+                
+                # Create a PDF object
+                pdf = FPDF()
+                pdf.add_page()
+                
+                # Set font (Korean support)
+                try:
+                    # Try to use Arial Unicode if available
+                    pdf.add_font('Arial', '', 'C:/Windows/Fonts/arial.ttf', uni=True)
+                    pdf.set_font('Arial', size=12)
+                except:
+                    try:
+                        # Try to use Malgun Gothic if available
+                        pdf.add_font('MalgunGothic', '', 'C:/Windows/Fonts/malgun.ttf', uni=True)
+                        pdf.set_font('MalgunGothic', size=12)
+                    except:
+                        # Fallback to default font
+                        pdf.add_font('Arial')
+                        pdf.set_font('Arial', size=12)
+                
+                # Add text to PDF with proper encoding
+                try:
+                    # Try to encode as UTF-8 first
+                    pdf.multi_cell(0, 10, txt=hwp_text.encode('utf-8', 'replace').decode('utf-8'))
+                except:
+                    try:
+                        # Fallback to cp949 encoding
+                        pdf.multi_cell(0, 10, txt=hwp_text.encode('cp949', 'replace').decode('cp949'))
+                    except:
+                        # Final fallback - just use the text as is
+                        pdf.multi_cell(0, 10, txt=hwp_text)
+                
+                # Save PDF to a bytes buffer
+                pdf_bytes = pdf.output(dest='S').encode('latin-1')
+                
+                # Return the PDF file
                 return send_file(
-                    pdf_path,
+                    BytesIO(pdf_bytes),
                     as_attachment=True,
-                    download_name=os.path.splitext(file.filename)[0] + '.pdf',
+                    download_name=f"{os.path.splitext(filename)[0]}.pdf",
                     mimetype='application/pdf'
                 )
-            else:
-                return jsonify({'error': 'PDF conversion failed - File not created'}), 500
                 
-        finally:
-            # 한글 종료
-            if hwp:
-                quit_hwp(hwp)
+            except Exception as e:
+                print(f"HWP to PDF conversion error: {str(e)}")
+                return jsonify({'error': f'HWP 파일 처리 중 오류가 발생했습니다: {str(e)}'}), 500
+                
+        except Exception as e:
+            print(f"File processing error: {str(e)}")
+            return jsonify({'error': f'파일 처리 중 오류가 발생했습니다: {str(e)}'}), 500
             
-            # 임시 파일 삭제
+        finally:
+            # Clean up temporary files
             try:
-                for path in [hwp_path, pdf_path]:
-                    if os.path.exists(path):
-                        os.remove(path)
+                shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
                 print(f"Error cleaning up temporary files: {e}")
-                    
+                
     except Exception as e:
         print(f"HWP to PDF conversion error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'서버 오류가 발생했습니다: {str(e)}'}), 500
 
 @app.route('/api/convert/pdf-to-image', methods=['POST'])
 def convert_pdf_to_image():
