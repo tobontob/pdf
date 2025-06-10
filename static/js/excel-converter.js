@@ -115,21 +115,21 @@ class ExcelConverter {
             return;
         }
 
-        const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
-        const endpoint = conversionType === 'pdfToExcel' 
-            ? '/api/convert/pdf-to-excel' 
-            : '/api/convert/excel-to-pdf';
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // PDF to Excel 옵션 추가
-        if (conversionType === 'pdfToExcel') {
-            formData.append('preserveFormatting', this.preserveFormatting.checked);
-            formData.append('detectTables', this.detectTables.checked);
-        }
-
         try {
+            const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
+            const endpoint = conversionType === 'pdfToExcel' 
+                ? '/api/convert/pdf-to-excel' 
+                : '/api/convert/excel-to-pdf';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // PDF to Excel 옵션 추가
+            if (conversionType === 'pdfToExcel') {
+                formData.append('preserveFormatting', this.preserveFormatting.checked);
+                formData.append('detectTables', this.detectTables.checked);
+            }
+
             this.progressBar.classList.remove('d-none');
             this.convertBtn.disabled = true;
             this.downloadBtn.classList.add('d-none');
@@ -141,14 +141,23 @@ class ExcelConverter {
             });
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error || '변환 중 오류가 발생했습니다.');
+                let errorMessage = '변환 중 오류가 발생했습니다.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    // JSON 파싱 실패 시 기본 오류 메시지 사용
+                }
+                throw new Error(errorMessage);
             }
 
             const blob = await response.blob();
+            if (blob.size === 0) {
+                throw new Error('변환된 파일이 비어 있습니다.');
+            }
+
             const url = URL.createObjectURL(blob);
-            
-            const outputFilename = `${file.name.split('.')[0]}.${conversionType === 'pdfToExcel' ? 'xlsx' : 'pdf'}`;
+            const outputFilename = `${file.name.split('.').slice(0, -1).join('.') || file.name}.${conversionType === 'pdfToExcel' ? 'xlsx' : 'pdf'}`;
             
             // 다운로드 링크 업데이트
             this.downloadBtn.href = url;
