@@ -436,6 +436,9 @@ def convert_hwp_to_pdf():
 
 @app.route('/api/convert/pdf-to-excel', methods=['POST'])
 def convert_pdf_to_excel():
+    output_path = None
+    input_path = None
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -452,27 +455,36 @@ def convert_pdf_to_excel():
         input_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_input.pdf")
         file.save(input_path)
         
-        try:
-            # PDF를 Excel로 변환
-            output_path = excel_converter.pdf_to_excel(
-                input_path,
-                preserve_formatting=preserve_formatting,
-                detect_tables=detect_tables
-            )
-            
-            # 변환된 파일 전송
-            return send_file(
-                output_path,
-                as_attachment=True,
-                download_name=f"{os.path.splitext(file.filename)[0]}.xlsx",
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-        finally:
-            # 임시 파일 삭제
-            excel_converter.cleanup(input_path, output_path)
-            
+        # PDF를 Excel로 변환
+        output_path = excel_converter.pdf_to_excel(
+            input_path,
+            preserve_formatting=preserve_formatting,
+            detect_tables=detect_tables
+        )
+        
+        if not output_path or not os.path.exists(output_path):
+            raise Exception("Failed to generate Excel file")
+        
+        # 변환된 파일 전송
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"{os.path.splitext(file.filename)[0]}.xlsx",
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"PDF to Excel conversion error: {str(e)}")
+        return jsonify({'error': f'PDF to Excel conversion failed: {str(e)}'}), 500
+    finally:
+        # 임시 파일 정리
+        try:
+            if input_path and os.path.exists(input_path):
+                os.unlink(input_path)
+            if output_path and os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception as e:
+            app.logger.error(f"Error cleaning up temporary files: {str(e)}")
 
 @app.route('/api/convert/excel-to-pdf', methods=['POST'])
 def convert_excel_to_pdf():
