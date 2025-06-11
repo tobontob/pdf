@@ -75,7 +75,7 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="container py-5">
+    <div class="container py-4">
         <div class="row justify-content-center">
             <div class="col-lg-8">
                 <div class="card border-0 shadow-sm">
@@ -92,6 +92,18 @@
                                 <input class="form-check-input" type="radio" name="conversionType" id="pdfToHwp" value="pdfToHwp">
                                 <label class="form-check-label" for="pdfToHwp">PDF → HWP</label>
                             </div>
+                        </div>
+
+                        <!-- 한글 오피스 설치 안내 문구 -->
+                        <div class="alert alert-warning alert-dismissible fade show mb-4 py-2" role="alert">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <div class="small">
+                                    <div>HWP 변환을 위해서는 한글 오피스가 필요합니다</div>
+                                    <div class="text-muted">한컴오피스 뷰어는 지원하지 않습니다</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
 
                         <!-- File Drop Zone -->
