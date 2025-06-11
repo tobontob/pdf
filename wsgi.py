@@ -150,6 +150,45 @@ def html_converter_page():
 def serve_static(filename):
     return send_from_directory('static', filename)
 
+# PDF to Word 변환 엔드포인트
+@app.route('/api/convert/pdf-to-docx', methods=['POST'])
+def convert_pdf_to_docx():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    try:
+        # 임시 파일 저장
+        unique_id = str(uuid.uuid4())
+        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_input.pdf")
+        docx_path = os.path.join(TEMP_DIR, f"{unique_id}_output.docx")
+        
+        file.save(pdf_path)
+        
+        # PDF를 DOCX로 변환
+        from pdf2docx import Converter
+        cv = Converter(pdf_path)
+        cv.convert(docx_path)
+        cv.close()
+        
+        return send_file(
+            docx_path,
+            as_attachment=True,
+            download_name=os.path.splitext(file.filename)[0] + '.docx',
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        # 임시 파일 정리
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            os.remove(pdf_path)
+        if 'docx_path' in locals() and os.path.exists(docx_path):
+            os.remove(docx_path)
+
 if __name__ == '__main__':
     # 정적 파일 디렉토리가 없으면 생성
     os.makedirs('static', exist_ok=True)
