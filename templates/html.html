@@ -1,353 +1,139 @@
 <!DOCTYPE html>
-{% extends "base.html" %}
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 변환 - PDF 변환 도구</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .nav-link {
+            color: #495057;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: #0d6efd;
+        }
+        .nav-link.active {
+            color: #0d6efd !important;
+        }
+        .drop-zone {
+            border: 2px dashed #0d6efd;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        .drop-zone:hover {
+            background: #e9ecef;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background: #e9ecef;
+            border-color: #0b5ed7;
+        }
+        .code-editor {
+            min-height: 300px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .preview-area {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            min-height: 300px;
+            padding: 1rem;
+            background: white;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">PDF 변환 도구</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">홈</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/html">HTML 변환</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/image">이미지 변환</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
-{% block content %}
-<div class="container mt-5">
-    <h1 class="text-center mb-4">HTML을 PDF로 변환</h1>
-    
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-body p-4">
-                    <!-- 파일 업로드 섹션 -->
-                    <div class="mb-4">
-                        <h5 class="mb-3">1. HTML 파일 업로드</h5>
-                        <div class="drop-zone" id="dropZone">
-                            <i class="bi bi-file-earmark-arrow-up display-4 mb-3"></i>
-                            <h5>HTML 파일을 드래그하거나 클릭하여 업로드</h5>
-                            <p class="text-muted mb-0">지원 형식: .html, .htm</p>
-                            <input type="file" id="fileInput" class="d-none" accept=".html,.htm">
-                        </div>
-                        <div id="fileInfo" class="mt-2 small text-muted"></div>
+    <!-- Main Content -->
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">HTML을 PDF로 변환</h5>
                     </div>
-                    
-                    <div class="mb-4">
-                        <h5 class="mb-3">또는</h5>
-                        <div class="input-group">
-                            <input type="text" id="urlInput" class="form-control" placeholder="웹사이트 URL을 입력하세요 (예: https://example.com)">
-                            <button class="btn btn-outline-secondary" type="button" id="loadUrlBtn">불러오기</button>
-                        </div>
-                    </div>
-                    
-                    <!-- 변환 옵션 -->
-                    <div class="mb-4">
-                        <h5 class="mb-3">2. 변환 옵션</h5>
-                        <div class="row g-3">
+                    <div class="card-body">
+                        <div class="row mb-4">
                             <div class="col-md-6">
-                                <label for="pageSize" class="form-label">용지 크기</label>
-                                <select class="form-select" id="pageSize">
-                                    <option value="A4" selected>A4 (210 × 297mm)</option>
-                                    <option value="A3">A3 (297 × 420mm)</option>
-                                    <option value="Letter">Letter (8.5 × 11인치)</option>
-                                    <option value="Legal">Legal (8.5 × 14인치)</option>
-                                </select>
+                                <h6>HTML 코드</h6>
+                                <textarea class="form-control code-editor" id="htmlCode" placeholder="HTML 코드를 입력하세요..."></textarea>
                             </div>
                             <div class="col-md-6">
-                                <label for="orientation" class="form-label">방향</label>
-                                <select class="form-select" id="orientation">
-                                    <option value="portrait" selected>세로</option>
-                                    <option value="landscape">가로</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="includeBackground" checked>
-                                    <label class="form-check-label" for="includeBackground">
-                                        배경색 포함
-                                    </label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">미리보기</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" id="refreshPreview">새로고침</button>
+                                </div>
+                                <div class="preview-area" id="previewArea">
+                                    <!-- 미리보기가 여기에 표시됩니다 -->
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- 미리보기 -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h5 class="mb-0">3. 미리보기</h5>
-                            <button class="btn btn-sm btn-outline-secondary" id="refreshPreview">새로고침</button>
-                        </div>
-                        <div class="border rounded p-3 bg-light" style="min-height: 200px;" id="previewArea">
-                            <p class="text-muted text-center my-5">파일을 업로드하거나 URL을 입력하시면 여기에 미리보기가 표시됩니다.</p>
+                        <div class="text-center">
+                            <button class="btn btn-primary" id="convertBtn">
+                                <i class="bi bi-file-earmark-pdf"></i> PDF로 변환
+                            </button>
                         </div>
                     </div>
-                    
-                    <!-- 변환 버튼 -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary" id="convertBtn" disabled>
-                            <i class="bi bi-file-earmark-pdf me-2"></i>PDF로 변환하기
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 도움말 섹션 -->
-            <div class="card mt-4 border-0 bg-light">
-                <div class="card-body">
-                    <h5 class="card-title">도움말</h5>
-                    <ul class="mb-0">
-                        <li>로컬 HTML 파일을 업로드하거나 웹사이트 URL을 입력하여 PDF로 변환할 수 있습니다.</li>
-                        <li>CSS가 포함된 HTML 파일의 경우, 상대 경로 대신 절대 경로를 사용하는 것이 좋습니다.</li>
-                        <li>웹사이트 변환 시 일부 동적 콘텐츠는 제대로 변환되지 않을 수 있습니다.</li>
-                    </ul>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const urlInput = document.getElementById('urlInput');
-    const loadUrlBtn = document.getElementById('loadUrlBtn');
-    const convertBtn = document.getElementById('convertBtn');
-    const previewArea = document.getElementById('previewArea');
-    const fileInfo = document.getElementById('fileInfo');
-    const refreshBtn = document.getElementById('refreshPreview');
-    
-    let currentContent = null;
-    let currentType = null; // 'file' 또는 'url'
-    
-    // 드래그 앤 드롭 이벤트 처리
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
-    });
-    
-    function highlight() {
-        dropZone.classList.add('border-primary', 'bg-light');
-    }
-    
-    function unhighlight() {
-        dropZone.classList.remove('border-primary', 'bg-light');
-    }
-    
-    // 파일 선택 처리
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('drop', handleDrop);
-    fileInput.addEventListener('change', handleFileSelect);
-    
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        if (files.length > 0) {
-            handleFiles(files);
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 미리보기 새로고침
+        document.getElementById('refreshPreview').addEventListener('click', updatePreview);
+        document.getElementById('htmlCode').addEventListener('input', updatePreview);
+
+        function updatePreview() {
+            const htmlCode = document.getElementById('htmlCode').value;
+            document.getElementById('previewArea').innerHTML = htmlCode;
         }
-    }
-    
-    function handleFileSelect(e) {
-        const files = e.target.files;
-        if (files.length > 0) {
-            handleFiles(files);
-        }
-    }
-    
-    function handleFiles(files) {
-        const file = files[0];
-        if (!file.type.includes('html') && !file.name.endsWith('.html') && !file.name.endsWith('.htm')) {
-            showAlert('HTML 파일만 업로드할 수 있습니다.', 'danger');
-            return;
-        }
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            currentContent = e.target.result;
-            currentType = 'file';
-            updateFileInfo(file.name, file.size);
-            updatePreview(currentContent, 'file');
-            convertBtn.disabled = false;
-        };
-        reader.readAsText(file);
-    }
-    
-    // URL 로드 처리
-    loadUrlBtn.addEventListener('click', loadUrl);
-    urlInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            loadUrl();
-        }
-    });
-    
-    function loadUrl() {
-        const url = urlInput.value.trim();
-        if (!url) {
-            showAlert('URL을 입력해주세요.', 'warning');
-            return;
-        }
-        
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            showAlert('유효한 URL을 입력해주세요. (http:// 또는 https://로 시작해야 합니다)', 'warning');
-            return;
-        }
-        
-        // CORS 프록시를 통한 요청 (개발용으로만 사용)
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        
-        convertBtn.disabled = true;
-        showAlert('웹사이트를 불러오는 중입니다...', 'info');
-        
-        fetch(proxyUrl)
-            .then(response => response.json())
-            .then(data => {
-                if (data.contents) {
-                    currentContent = data.contents;
-                    currentType = 'url';
-                    updateFileInfo(url, 0);
-                    updatePreview(currentContent, 'url');
-                    convertBtn.disabled = false;
-                    showAlert('웹사이트를 성공적으로 불러왔습니다.', 'success');
-                } else {
-                    throw new Error('웹사이트를 불러올 수 없습니다.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showAlert('웹사이트를 불러오는 중 오류가 발생했습니다: ' + error.message, 'danger');
-            });
-    }
-    
-    // 미리보기 업데이트
-    function updatePreview(content, type) {
-        if (type === 'url') {
-            // URL인 경우 iframe으로 표시
-            previewArea.innerHTML = `
-                <div class="ratio ratio-16x9">
-                    <iframe srcdoc='${content.replace(/'/g, "'")}' 
-                            style="border: none; width: 100%; height: 100%;">
-                    </iframe>
-                </div>`;
-        } else {
-            // 파일인 경우 일반적으로 표시
-            previewArea.innerHTML = `
-                <div class="p-3">
-                    <h6>HTML 미리보기:</h6>
-                    <div class="border rounded p-3 bg-white" style="max-height: 300px; overflow: auto;">
-                        ${content}
-                    </div>
-                </div>`;
-        }
-    }
-    
-    // 파일 정보 업데이트
-    function updateFileInfo(name, size) {
-        let sizeText = '';
-        if (size > 0) {
-            sizeText = ` (${formatFileSize(size)})`;
-        }
-        fileInfo.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i> ${name}${sizeText}`;
-    }
-    
-    // 파일 크기 포맷팅
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-    
-    // 알림 표시
-    function showAlert(message, type) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
-        alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        
-        // 기존 알림 제거
-        const existingAlert = document.querySelector('.alert');
-        if (existingAlert) {
-            existingAlert.remove();
-        }
-        
-        document.querySelector('.container.mt-5').insertBefore(alertDiv, document.querySelector('.row'));
-    }
-    
-    // 새로고침 버튼
-    refreshBtn.addEventListener('click', function() {
-        if (currentContent && currentType) {
-            updatePreview(currentContent, currentType);
-        }
-    });
-    
-    // 변환 버튼 클릭
-    convertBtn.addEventListener('click', function() {
-        if (!currentContent) return;
-        
-        const pageSize = document.getElementById('pageSize').value;
-        const orientation = document.getElementById('orientation').value;
-        const includeBackground = document.getElementById('includeBackground').checked;
-        
-        // 로딩 상태 표시
-        const originalText = convertBtn.innerHTML;
-        convertBtn.disabled = true;
-        convertBtn.innerHTML = `
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            변환 중...
-        `;
-        
-        // 서버로 전송할 데이터 준비
-        const formData = new FormData();
-        formData.append('content', currentContent);
-        formData.append('type', currentType);
-        formData.append('options', JSON.stringify({
-            pageSize,
-            orientation,
-            includeBackground
-        }));
-        
-        // 서버에 변환 요청
-        fetch('/convert/html-to-pdf', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => {
-                    throw new Error(err.error || '변환 중 오류가 발생했습니다.');
-                });
+
+        // 변환 버튼 클릭 이벤트
+        document.getElementById('convertBtn').addEventListener('click', function() {
+            const htmlCode = document.getElementById('htmlCode').value;
+            if (!htmlCode.trim()) {
+                alert('변환할 HTML 코드를 입력해주세요.');
+                return;
             }
-            return response.blob();
-        })
-        .then(blob => {
-            // 다운로드 링크 생성
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `converted_${new Date().getTime()}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            a.remove();
             
-            showAlert('PDF 변환이 완료되었습니다!', 'success');
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('변환 중 오류가 발생했습니다: ' + error.message, 'danger');
-        })
-        .finally(() => {
-            convertBtn.disabled = false;
-            convertBtn.innerHTML = originalText;
+            // 여기에 변환 로직 추가
+            alert('PDF 변환 기능이 실행됩니다.');
         });
-    });
-});
-</script>
-{% endblock %}
+
+        // 초기 미리보기 업데이트
+        updatePreview();
+    </script>
+</body>
+</html>

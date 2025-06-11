@@ -1,26 +1,39 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "wsgi.py",
-            "use": "@vercel/python"
-        },
-        {
-            "src": "static/",
-            "use": "@vercel/static"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/static/(.*)",
-            "dest": "/static/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/wsgi.py"
-        }
-    ],
-    "env": {
-        "PYTHONPATH": "."
+  "version": 2,
+  "builds": [
+    {
+      "src": "wsgi.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "includeFiles": [
+          "templates/**",
+          "static/**"
+        ]
+      }
+    },
+    {
+      "src": "static/**",
+      "use": "@vercel/static"
     }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/wsgi.py"
+    }
+  ],
+  "build": {
+    "env": {
+      "PYTHON_VERSION": "3.9",
+      "LD_LIBRARY_PATH": "/var/task/lib:/var/task/bin"
+    }
+  },
+  "env": {
+    "PYTHONPATH": "/var/task"
+  }
 }

@@ -4,8 +4,7 @@ import tempfile
 from werkzeug.utils import secure_filename
 import uuid
 import shutil
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
+import pdfkit
 import base64
 import json
 import time
@@ -24,143 +23,136 @@ TEMP_DIR = os.path.join(tempfile.gettempdir(), 'pdf_converter')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR, exist_ok=True)
 
+# PDF 변환 옵션
+PDF_OPTIONS = {
+    'page-size': 'A4',
+    'margin-top': '10mm',
+    'margin-right': '10mm',
+    'margin-bottom': '10mm',
+    'margin-left': '10mm',
+    'encoding': 'UTF-8',
+    'no-outline': None,
+    'quiet': ''
+}
+
 # HTML을 PDF로 변환하는 함수
 def html_to_pdf(html_content, options=None):
     if options is None:
         options = {}
     
-    # 고유한 파일명 생성
-    output_filename = f"converted_{uuid.uuid4().hex}.pdf"
-    output_path = os.path.join(TEMP_DIR, output_filename)
-    
     try:
-        # WeasyPrint 스타일 설정
-        styles = """
-            @page {
-                size: %s %s;
-                margin: 20mm;
-            }
-            body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                margin: 0;
-                padding: 0;
-            }
-            img {
-                max-width: 100%%;
-                height: auto;
-            }
-        """ % (
-            options.get('pageSize', 'A4'),
-            options.get('orientation', 'portrait')
+        # 고유한 파일명 생성
+        output_filename = os.path.join(TEMP_DIR, f"output_{uuid.uuid4().hex}.pdf")
+        
+        # PDF 생성
+        pdfkit.from_string(
+            input=html_content,
+            output_path=output_filename,
+            options=options,
+            verbose=True
         )
         
-        if not options.get('includeBackground', True):
-            styles += """
-                @page {
-                    background: white !important;
-                }
-                body {
-                    background: white !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-            """
-        
-        # WeasyPrint로 HTML을 PDF로 변환
-        if isinstance(html_content, bytes):
-            html_content = html_content.decode('utf-8')
-            
-        # Base64 이미지 처리
-        if ';base64,' in html_content:
-            # base64 이미지 처리 로직 (필요시 구현)
-            pass
-            
-        # CSS 적용
-        css = CSS(string=styles)
-        
-        # HTML 변환
-        HTML(string=html_content).write_pdf(
-            output_path,
-            stylesheets=[css]
-        )
-        
-        return output_path
+        return output_filename
         
     except Exception as e:
-        print(f"HTML을 PDF로 변환하는 중 오류 발생: {str(e)}")
+        print(f"Error in html_to_pdf: {str(e)}", file=sys.stderr)
         raise
 
 # HTML을 PDF로 변환하는 엔드포인트
-@app.route('/convert/html-to-pdf', methods=['POST'])
+@app.route('/api/convert/html', methods=['POST'])
 def convert_html_to_pdf():
+    if 'file' not in request.files and 'html' not in request.form:
+        return jsonify({"error": "No file or HTML content provided"}), 400
+    
     try:
-        if 'content' not in request.form and 'file' not in request.files:
-            return jsonify({'error': '변환할 콘텐츠가 없습니다.'}), 400
-            
-        content = request.form.get('content', '')
-        options = request.form.get('options')
-        
-        if options:
-            try:
-                options = json.loads(options)
-            except json.JSONDecodeError:
-                options = {}
-        else:
-            options = {}
-        
-        # 파일 업로드 처리
-        if 'file' in request.files:
+        if 'file' in request.files and request.files['file'].filename != '':
+            # 파일 업로드 처리
             file = request.files['file']
-            if file.filename != '':
-                content = file.read().decode('utf-8')
+            if file.filename == '':
+                return jsonify({"error": "No selected file"}), 400
+                
+            html_content = file.read().decode('utf-8')
+        else:
+            # 텍스트 에디터에서 온 HTML 내용 처리
+            html_content = request.form.get('html', '')
         
-        if not content:
-            return jsonify({'error': '변환할 콘텐츠가 비어 있습니다.'}), 400
+        # PDF 옵션 설정
+        options = PDF_OPTIONS.copy()
+        options.update({
+            'page-size': request.form.get('page_size', 'A4'),
+            'orientation': request.form.get('orientation', 'portrait'),
+        })
         
-        # HTML을 PDF로 변환
-        pdf_path = html_to_pdf(content, options)
+        # PDF 생성
+        output_pdf = html_to_pdf(html_content, options)
         
-        # 변환된 PDF 파일 전송
+        # 생성된 PDF 파일 전송
         return send_file(
-            pdf_path,
+            output_pdf,
             as_attachment=True,
-            download_name=f"converted_{int(time.time())}.pdf",
+            download_name='converted.pdf',
             mimetype='application/pdf'
         )
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         # 임시 파일 정리
-        try:
-            if 'pdf_path' in locals() and os.path.exists(pdf_path):
-                os.remove(pdf_path)
-        except Exception as e:
-            print(f"임시 파일 삭제 중 오류: {e}")
+        if 'output_pdf' in locals() and os.path.exists(output_pdf):
+            try:
+                os.remove(output_pdf)
+            except:
+                pass
 
 # 라우트 정의
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/convert')
+def convert():
+    return render_template('convert.html')
+
+@app.route('/document')
+def document():
+    return render_template('document.html')
+
+@app.route('/excel')
+def excel():
+    return render_template('excel.html')
+
 @app.route('/html')
-def html_converter_page():
+def html():
     return render_template('html.html')
 
+@app.route('/hwp')
+def hwp():
+    return render_template('hwp.html')
+
+@app.route('/image')
+def image():
+    return render_template('image.html')
+
+@app.route('/powerpoint')
+def powerpoint():
+    return render_template('powerpoint.html')
+
 @app.route('/secret')
-def secret_page():
+def secret():
     return render_template('secret.html')
 
-# Vercel 호환을 위한 핸들러
-def vercel_handler(event, context):
-    with app.app_context():
-        response = app.full_dispatch_request()
-        return {
-            'statusCode': response.status_code,
-            'headers': dict(response.headers),
-            'body': response.get_data(as_text=True)
-        }
+@app.route('/html-converter')
+def html_converter_page():
+    return render_template('html_converter.html')
+
+# 정적 파일 서빙을 위한 라우트
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 정적 파일 디렉토리가 없으면 생성
+    os.makedirs('static', exist_ok=True)
+    os.makedirs('templates', exist_ok=True)
+    # 로컬 개발 환경에서만 디버그 모드로 실행
+    app.run(debug=True, host='0.0.0.0', port=5000)
