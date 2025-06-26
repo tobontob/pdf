@@ -1,15 +1,20 @@
-from flask import Flask, render_template, request, send_file, jsonify, send_from_directory
 import os
+from flask import Flask, render_template, request, send_file, jsonify, send_from_directory
 import tempfile
 from werkzeug.utils import secure_filename
 import uuid
 import shutil
-import pdfkit
 import base64
 import json
 import time
 import sys
 import platform
+from docx import Document
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import inch
 
 # Flask 앱 생성
 app = Flask(__name__, 
@@ -44,14 +49,32 @@ def html_to_pdf(html_content, options=None):
         # 고유한 파일명 생성
         output_filename = os.path.join(TEMP_DIR, f"output_{uuid.uuid4().hex}.pdf")
         
-        # PDF 생성
-        pdfkit.from_string(
-            input=html_content,
-            output_path=output_filename,
-            options=options,
-            verbose=True
-        )
+        # HTML을 간단한 텍스트로 변환하여 PDF 생성
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
         
+        c = canvas.Canvas(output_filename, pagesize=A4)
+        width, height = A4
+        
+        y_position = height - 50
+        line_height = 20
+        
+        # HTML 태그 제거하고 텍스트만 추출
+        import re
+        text_content = re.sub('<[^<]+?>', '', html_content)
+        lines = text_content.split('\n')
+        
+        for line in lines:
+            if line.strip():
+                if y_position < 50:
+                    c.showPage()
+                    y_position = height - 50
+                
+                c.setFont('Helvetica', 12)
+                c.drawString(50, y_position, line.strip())
+                y_position -= line_height
+        
+        c.save()
         return output_filename
         
     except Exception as e:
@@ -160,6 +183,9 @@ def convert_pdf_to_docx():
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
 
+    pdf_path = None
+    docx_path = None
+    
     try:
         # 임시 파일 저장
         unique_id = str(uuid.uuid4())
@@ -174,20 +200,122 @@ def convert_pdf_to_docx():
         cv.convert(docx_path)
         cv.close()
         
-        return send_file(
+        # 파일 전송 후 정리를 위해 별도 함수로 처리
+        def cleanup_files():
+            try:
+                if pdf_path and os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+                if docx_path and os.path.exists(docx_path):
+                    os.remove(docx_path)
+            except Exception as e:
+                print(f"File cleanup error: {e}")
+        
+        # 파일 전송
+        response = send_file(
             docx_path,
             as_attachment=True,
             download_name=os.path.splitext(file.filename)[0] + '.docx',
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
+        
+        # 응답 완료 후 파일 정리
+        response.call_on_close(cleanup_files)
+        return response
+        
     except Exception as e:
+        # 에러 발생 시 즉시 파일 정리
+        try:
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+            if docx_path and os.path.exists(docx_path):
+                os.remove(docx_path)
+        except:
+            pass
         return jsonify({'error': str(e)}), 500
-    finally:
-        # 임시 파일 정리
-        if 'pdf_path' in locals() and os.path.exists(pdf_path):
-            os.remove(pdf_path)
-        if 'docx_path' in locals() and os.path.exists(docx_path):
-            os.remove(docx_path)
+
+@app.route('/api/convert/docx-to-pdf', methods=['POST'])
+def convert_docx_to_pdf():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    docx_path = None
+    pdf_path = None
+    
+    try:
+        unique_id = str(uuid.uuid4())
+        docx_path = os.path.join(TEMP_DIR, f"{unique_id}_input.docx")
+        pdf_path = os.path.join(TEMP_DIR, f"{unique_id}_output.pdf")
+        file.save(docx_path)
+        
+        # DOCX → PDF 변환 (reportlab + NotoSansKR 한글 폰트)
+        from docx import Document
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        
+        # 폰트 등록 (이미 등록되어 있으면 예외 무시)
+        font_path = os.path.join('static', 'fonts', 'NotoSansKR-Regular.ttf')
+        try:
+            pdfmetrics.registerFont(TTFont('NotoSansKR', font_path))
+        except:
+            pass
+        
+        doc = Document(docx_path)
+        
+        # PDF 생성
+        c = canvas.Canvas(pdf_path, pagesize=A4)
+        width, height = A4
+        
+        y_position = height - 50  # 시작 위치
+        line_height = 20
+        
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                if y_position < 50:
+                    c.showPage()
+                    y_position = height - 50
+                c.setFont('NotoSansKR', 12)  # 한글 폰트 사용
+                c.drawString(50, y_position, paragraph.text)
+                y_position -= line_height
+        
+        c.save()
+        
+        # 파일 전송 후 정리를 위해 별도 함수로 처리
+        def cleanup_files():
+            try:
+                if docx_path and os.path.exists(docx_path):
+                    os.remove(docx_path)
+                if pdf_path and os.path.exists(pdf_path):
+                    os.remove(pdf_path)
+            except Exception as e:
+                print(f"File cleanup error: {e}")
+        
+        # 파일 전송
+        response = send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=os.path.splitext(file.filename)[0] + '.pdf',
+            mimetype='application/pdf'
+        )
+        
+        # 응답 완료 후 파일 정리
+        response.call_on_close(cleanup_files)
+        return response
+        
+    except Exception as e:
+        # 에러 발생 시 즉시 파일 정리
+        try:
+            if docx_path and os.path.exists(docx_path):
+                os.remove(docx_path)
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        except:
+            pass
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # 정적 파일 디렉토리가 없으면 생성

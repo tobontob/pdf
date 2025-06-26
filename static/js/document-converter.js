@@ -108,7 +108,7 @@ class DocumentConverter {
         if (!file) return;
 
         const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
-        const endpoint = conversionType === 'pdfToDoc' ? '/api/convert/pdf-to-doc' : '/api/convert/doc-to-pdf';
+        const endpoint = conversionType === 'pdfToDoc' ? '/api/convert/pdf-to-docx' : '/api/convert/docx-to-pdf';
 
         const formData = new FormData();
         formData.append('file', file);
@@ -125,8 +125,15 @@ class DocumentConverter {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || '변환 중 오류가 발생했습니다.');
+                const errorText = await response.text();
+                let errorMessage;
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.error || '변환 중 오류가 발생했습니다.';
+                } catch (e) {
+                    errorMessage = errorText || '변환 중 오류가 발생했습니다.';
+                }
+                throw new Error(errorMessage);
             }
 
             const blob = await response.blob();
